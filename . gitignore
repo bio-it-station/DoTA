@@ -1,0 +1,14 @@
+# ignore anything
+*
+
+# markdown, python, R
+!*.md
+!*.py
+!*.ipynb
+!*.R
+
+# subdirectories
+!*/
+!*/*.py
+!*/*.ipynb
+!*/*.R
