@@ -61,8 +61,8 @@ dat$group <- apply(dat[, c("psi","mean","sd")], 1, sd_group, c1='mean', c2='sd',
 
 # Plot the figure
 library(ggplot2)
-dir.create("./results", showWarnings = FALSE)
-png(file = "./results/psi_distribution.png", width = 4.5, height = 6, units = "in", res = 300)
+dir.create("../results", showWarnings = FALSE)
+png(file = "../results/psi_distribution.png", width = 4.5, height = 6, units = "in", res = 300)
 ggplot(dat, aes(psi, gene, colour = group))+
   geom_point(size = 0.01)+
   scale_color_manual(values=c("#808080", "#FF0000", "#56B4E9"))+
