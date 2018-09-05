@@ -1,15 +1,15 @@
 import argparse
-import pickle
-import sys
 import errno
 import os
+import pickle
+import sys
 from itertools import combinations
 
 import numpy as np
 from scipy.special import comb
 
 
-def parse_options(argv):
+def parse_options():
     """
     Argument parser
     :param argv: arguments from sys.argv
@@ -26,8 +26,9 @@ def parse_options(argv):
     input_output.add_argument(
         '--o', metavar='<output-dir>', default='./input/',
         help='Output file directory (default=\'./input/\')')
-    
+
     return parser.parse_args()
+
 
 def delta_data_converter(x, y, tf_list, data_order):
     """
@@ -41,7 +42,7 @@ def delta_data_converter(x, y, tf_list, data_order):
     """
     genes = data_order.groupby('Gene').count()[data_order.groupby('Gene').count() > 1].dropna()
 
-    '''Create an nan array with estimated event numbers as new features array'''
+    # Create an nan array with estimated event numbers as new features array
     esti_events_num = 0
     for num in genes['Tissue']:
         esti_events_num += comb(num, 2)
@@ -51,7 +52,7 @@ def delta_data_converter(x, y, tf_list, data_order):
     new_x = np.zeros((esti_events_num, len(tf_list)))
     new_x[:] = np.nan
 
-    '''Fill the delta data into array'''
+    # Fill the delta data into array
     i = 0
     new_y = []
     for gene in genes.index:
@@ -73,7 +74,8 @@ def delta_data_converter(x, y, tf_list, data_order):
     y = np.asarray(new_y, dtype='float16')
 
     return x, y
-    
+
+
 def update_progress_bar(perc, option_info=None):
     """
     update progress bar
@@ -85,6 +87,7 @@ def update_progress_bar(perc, option_info=None):
                                        perc,
                                        option_info))
     sys.stdout.flush()
+
 
 def output(var, filename):
     """
@@ -101,18 +104,20 @@ def output(var, filename):
     with open(filename, mode='wb') as fh:
         pickle.dump((var), fh)
 
+
 def main():
-    args = parse_options(sys.argv)
-    
+    args = parse_options()
+
     with open(args.i, mode='rb') as fh:
         X, Y, Tf_list, Data_order = pickle.load(fh)
-    
+
     print('Converting delta data...')
     X, Y = delta_data_converter(X, Y, Tf_list, Data_order)
     print('Delta data coverting complete!')
 
     filename = args.o + 'delta_data.pickle'
     output((X, Y, Tf_list), filename)
+
 
 if __name__ == '__main__':
     main()

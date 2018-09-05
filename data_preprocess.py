@@ -5,14 +5,14 @@ import pickle
 import sys
 from collections import defaultdict
 
-
 import numpy as np
 import pandas as pd
 from scipy.sparse import coo_matrix
+
 from delta_data_preprocess import delta_data_converter
 
 
-def parse_options(argv):
+def parse_options():
     """
     Argument parser
     :param argv: arguments from sys.argv
@@ -50,6 +50,7 @@ def parse_options(argv):
 
     return parser.parse_args()
 
+
 def cart_data_converter(features, y, tf_list):
     """
     Generate data for CART (without position information)
@@ -72,6 +73,7 @@ def cart_data_converter(features, y, tf_list):
             update_progress_bar(i / num_data * 100, '{}/{}'.format(i, num_data))
 
     return x
+
 
 def nn_data_converter(features, y, tf_list):
     """
@@ -104,6 +106,7 @@ def nn_data_converter(features, y, tf_list):
 
     return x
 
+
 def update_progress_bar(perc, option_info=None):
     """
     update progress bar
@@ -116,6 +119,7 @@ def update_progress_bar(perc, option_info=None):
                                        option_info))
     sys.stdout.flush()
 
+
 def output(var, filename):
     try:
         os.makedirs(os.path.dirname(filename))
@@ -126,8 +130,9 @@ def output(var, filename):
     with open(filename, mode='wb') as fh:
         pickle.dump((var), fh)
 
+
 def main():
-    args = parse_options(sys.argv)
+    args = parse_options()
 
     # Read RNA files and generate Y_data and event-genes list
     targets_tissue_list = set()
@@ -144,7 +149,7 @@ def main():
                 for line in fh:
                     targets_data.append(line.strip().split() + [tissue_name])
             print('DONE!')
-    
+
     Y = pd.DataFrame(targets_data, columns=['Gene', 'PSI', 'Tissue'])
     Y['PSI'] = Y['PSI'].astype(np.float64)
     Y['Tissue'] = Y['Tissue'].astype('category')
@@ -183,7 +188,7 @@ def main():
     # Convert data for NN or CART
     print('\n' + '-' * 60 + '\n')
     print('Converting data...\n')
-    
+
     # if args.C:
     X = cart_data_converter(features_data, Y, Tf_list)
     filename = args.o + 'rf_data.pickle'
@@ -200,11 +205,12 @@ def main():
     if args.d:
         print('\n' + '-' * 60 + '\n')
         print('Converting delta data...')
-        
+
         X, Y = delta_data_converter(X, Y['PSI'], Tf_list, Y[['Tissue', 'Gene']])
         filename = args.o + 'delta_data.pickle'
         output((X, Y), filename)
         print('Delta data coverting complete!')
+
 
 if __name__ == '__main__':
     main()
