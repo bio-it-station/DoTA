@@ -208,7 +208,7 @@ def main():
 
         X, Y = delta_data_converter(X, Y['PSI'], Tf_list, Y[['Tissue', 'Gene']])
         filename = args.o + 'delta_data.pickle'
-        output((X, Y), filename)
+        output((X, Y, Tf_list), filename)
         print('Delta data coverting complete!')
 
 
