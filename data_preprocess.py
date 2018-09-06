@@ -61,7 +61,7 @@ def cart_data_converter(features, y, tf_list):
     """
     num_data = y.shape[0]
     num_tf = len(tf_list)
-    x = np.zeros((num_data, num_tf), dtype=np.bool)
+    x = np.zeros((num_data, num_tf), dtype='bool')
 
     for i, [gene, _, tissue] in enumerate(y.values):
         for j, tf in enumerate(tf_list):
@@ -101,7 +101,7 @@ def nn_data_converter(features, y, tf_list):
             update_progress_bar(i / num_data * 100, '{}/{}'.format(i, num_data))
 
     data = [True] * len(row)
-    x = coo_matrix((data, (row, col)), shape=(num_data * num_tf, 2500), dtype=np.bool)
+    x = coo_matrix((data, (row, col)), shape=(num_data * num_tf, 2500), dtype='bool')
     x = x.tocsr()
 
     return x
@@ -151,7 +151,7 @@ def main():
             print('DONE!')
 
     Y = pd.DataFrame(targets_data, columns=['Gene', 'PSI', 'Tissue'])
-    Y['PSI'] = Y['PSI'].astype(np.float64)
+    Y['PSI'] = Y['PSI'].astype('float64')
     Y['Tissue'] = Y['Tissue'].astype('category')
     Y = Y.sort_values(['Tissue', 'Gene'])
     Y = Y.reset_index(drop=True)

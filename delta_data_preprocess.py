@@ -68,8 +68,7 @@ def delta_data_converter(x, y, tf_list, data_order):
             i += 1
             if i == esti_events_num or i % 1000 == 0:
                 update_progress_bar(i / esti_events_num * 100, '{}/{}'.format(i, esti_events_num))
-    print()
-    print('Events processed: {} , DONE'.format(i))
+    print('\nEvents processed: {} , DONE'.format(i))
     x = new_x[~np.isnan(new_x).any(axis=1)]
     y = np.asarray(new_y, dtype='float16')
 
