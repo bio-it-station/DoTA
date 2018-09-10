@@ -34,6 +34,9 @@ def parse_options():
         '--t', metavar='<target-dir>', default='./input/targets/', help='Targets files directory \
         (default=\'./input/targets/\')')
     input_output.add_argument(
+        '--w', metavar='<tf_weight>', default='./input/tf_weight.csv', help='TF weighting matrix files \
+        (default=\'./input/tf_weight.csv\')')
+    input_output.add_argument(
         '--o', metavar='<output-dir>', default='./input/', help='Output file directory \
         (default=\'./input/\')')
 
@@ -51,12 +54,13 @@ def parse_options():
     return parser.parse_args()
 
 
-def cart_data_converter(features, y, tf_list):
+def cart_data_converter(features, y, tf_list, tf_weight):
     """
     Generate data for CART (without position information)
     :param features: features from dhs_peaks + tf_motifs + promoter region
     :param y: gene-psi pairs for collected tissues
     :param tf_list: transcription factor list
+    :param tf_weight: transcription factor weighting matrix
     :return x: feature data for CART model
     """
     num_data = y.shape[0]
@@ -66,6 +70,8 @@ def cart_data_converter(features, y, tf_list):
     for i, [gene, _, tissue] in enumerate(y.values):
         for j, tf in enumerate(tf_list):
             full_id = tissue + gene + tf
+            if 1 > tf_weight.loc[tissue, tf]:
+                continue
             if full_id in features:
                 x[i][j] = True
         i += 1
@@ -145,7 +151,7 @@ def main():
             tissue_name = file.split('.')[0]
             targets_tissue_list.add(tissue_name)
             print(tissue_name + '...', end='')
-            with open(targets_path+file) as fh:
+            with open(targets_path + file) as fh:
                 for line in fh:
                     targets_data.append(line.strip().split() + [tissue_name])
             print('DONE!')
@@ -185,12 +191,18 @@ def main():
         print('Error: features and targets didn\'t matched')
         exit(1)
 
+    # Loading transcription factor weighting matrix file
+    if args.w:
+        Tf_weight = pd.read_csv(args.w)
+    else:
+        Tf_weight = pd.DataFrame(1, index=targets_tissue_list, columns=Tf_list)
+
     # Convert data for NN or CART
     print('\n' + '-' * 60 + '\n')
     print('Converting data...\n')
 
     # if args.C:
-    X = cart_data_converter(features_data, Y, Tf_list)
+    X = cart_data_converter(features_data, Y, Tf_list, Tf_weight)
     filename = args.o + 'rf_data.pickle'
 
     # else:
