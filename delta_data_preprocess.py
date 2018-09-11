@@ -57,8 +57,8 @@ def delta_data_converter(x, y, tf_list, data_order):
     i = 0
     new_y = []
     for gene in genes.index:
-        event_ind_list = data_order.index[(data_order['Gene'] == gene) == True].tolist()
-        for event_1, event_2 in list(combinations(event_ind_list, 2)):
+        event_ind_list = data_order.index[data_order['Gene'] == gene].tolist()
+        for event_1, event_2 in combinations(event_ind_list, 2):
             delta_psi = abs(y[event_1] - y[event_2])
             if delta_psi:
                 delta_feature = x[event_1] ^ x[event_2]
