@@ -5,7 +5,18 @@ import pandas as pd
 
 
 def summarize_tf_exp(acc_df, tf_id, input_path):
-    print(acc_df)
+    tf_name = list(tf_id.keys())
+    tf_id = list(tf_id.values())
+    result_dict = {}
+
+    for _, (tissue, acc_list) in acc_df.iterrows():
+        acc_list = acc_list.split(',')
+        for acc in acc_list:
+            df = pd.read_table(input_path + acc + '.tsv', index_col=0)
+            tf_exp = df['TPM'][tf_id].values
+            result_dict[tissue] = tf_exp
+
+    return pd.DataFrame.from_dict(result_dict, orient='index', columns=tf_name)
 
 
 def main():
@@ -21,9 +32,11 @@ def main():
     args = parser.parse_args()
 
     # read list
-    acc_df = pd.read_table(args.list)
-    tf_id = pd.read_table(args.tf, index_col=1, header=None).T.to_dict()[0]
-    summarize_tf_exp(acc_df, tf_id, args.input)
+    acc_df = pd.read_table(args.list, header=None)
+    tf_id = pd.read_table(args.tf, header=None, index_col=1).iloc[:, 0].to_dict()
+    # summarize data into DataFrame
+    tf_exp_df = summarize_tf_exp(acc_df, tf_id, args.input)
+    tf_exp_df.to_csv(args.output, sep='\t')
 
 
 if __name__ == '__main__':
