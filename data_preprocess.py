@@ -35,8 +35,7 @@ def parse_options():
         '--t', metavar='<target-dir>', default='./input/targets/', help='Targets files directory \
         (default=\'./input/targets/\')')
     input_output.add_argument(
-        '--w', metavar='<tf_weight>', default='./input/tf_weight.csv', help='TF weighting matrix files \
-        (default=\'./input/tf_weight.csv\')')
+        '--w', metavar='<tf_weight>', help='TF weighting matrix files')
     input_output.add_argument(
         '--o', metavar='<output-dir>', default='./input/', help='Output file directory \
         (default=\'./input/\')')
@@ -55,7 +54,7 @@ def parse_options():
     return parser.parse_args()
 
 
-def cart_data_converter(features, y, tf_list, tf_weight):
+def cart_data_converter(features, y, tf_list, tf_weight=None):
     """
     Generate data for CART (without position information)
     :param features: features from dhs_peaks + tf_motifs + promoter region
@@ -71,10 +70,8 @@ def cart_data_converter(features, y, tf_list, tf_weight):
     for i, [gene, _, tissue] in enumerate(y.values):
         for j, tf in enumerate(tf_list):
             full_id = tissue + gene + tf
-            if 1 > tf_weight.loc[tissue, tf]:
-                continue
             if full_id in features:
-                x[i][j] = True
+                x[i][j] = tf_weight.at[tissue, tf]
         i += 1
         if i == num_data or i % 1000 == 0:
             update_progress_bar(i / num_data * 100, '{}/{}'.format(i, num_data))
@@ -194,9 +191,10 @@ def main():
 
     # Loading transcription factor weighting matrix file
     if args.w:
-        Tf_weight = pd.read_csv(args.w)
+        Tf_weight = pd.read_table(args.w, index_col=0)
+        Tf_weight = Tf_weight > 1
     else:
-        Tf_weight = pd.DataFrame(1, index=targets_tissue_list, columns=Tf_list)
+        Tf_weight = pd.DataFrame(True, index=targets_tissue_list, columns=Tf_list)
 
     # Convert data for NN or CART
     print('\n' + '-' * 60 + '\n')
