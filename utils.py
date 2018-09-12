@@ -17,7 +17,7 @@ def psi_z_score(X: np.ndarray, Y: pd.DataFrame) -> Tuple[np.ndarray, pd.DataFram
     gene_list = gene_count[gene_count > 2].index
     filerted_mask = Y['Gene'].isin(gene_list)
     X = X[filerted_mask]
-    Y = Y[filerted_mask]
+    Y = Y[filerted_mask].reset_index(drop=True)
 
     # calculate mean
     psi_gene_group = Y.groupby('Gene')
@@ -30,7 +30,7 @@ def psi_z_score(X: np.ndarray, Y: pd.DataFrame) -> Tuple[np.ndarray, pd.DataFram
 
     # calculate z-score
     z_score = [(psi - psi_mean[gene]) / psi_sd[gene] for gene, psi in zip(Y['Gene'], Y['PSI'])]
-    Y['PSI'] = z_score
+    Y = Y.assign(PSI=z_score)
     print('DONE!')
 
     return X, Y

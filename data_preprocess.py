@@ -192,11 +192,11 @@ def main():
 
     # Convert data for NN or CART
     print('\n' + '-' * 60 + '\n')
-    print('Converting data...', end='')
+    print('Converting data...')
     X = cart_data_converter(features_data, Y, Tf_list, Tf_weight)
+    print('\nDONE!')
     if args.z:
         X, Y = psi_z_score(X, Y)
-    print('DONE!')
 
     print('Saving converted data...')
     filename = args.o + 'rf' + ('_zscore' if args.z else '') + '_data.pickle'
@@ -205,11 +205,11 @@ def main():
 
     if args.d:
         print('\n' + '-' * 60 + '\n')
-        print('Converting delta data...', end='')
+        print('Converting delta data...\n')
         delta_X, delta_Y = delta_data_converter(X, Y['PSI'], Tf_list, Y[['Tissue', 'Gene']])
         if args.z:
             delta_X, delta_Y = psi_z_score(delta_X, delta_Y)
-        print('DONE!')
+        print('\nDONE!')
 
         print('Saving converted delta data...')
         filename = args.o + 'delta' + ('_zscore' if args.z else '') + '_data.pickle'
