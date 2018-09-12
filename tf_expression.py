@@ -21,13 +21,13 @@ def summarize_tf_exp(acc_df, tf_id, input_path):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-i', '--input', default='./rna_seq_rsem/',
+    parser.add_argument('-i', '--input', default='./input/rna_seq_rsem/',
                         help='Folder of RNA-Seq gene quantification result (RSEM)')
-    parser.add_argument('-l', '--list', default='gene_quant_acc.tsv',
+    parser.add_argument('-l', '--list', default='./input/gene_quant_acc.tsv',
                         help='List of accession from ENCODE')
-    parser.add_argument('-t', '--tf', default='tf_id_name.tsv',
+    parser.add_argument('-t', '--tf', default='./input/tf_id_name.tsv',
                         help='TF name and it\'s Ensembl gene ID')
-    parser.add_argument('-o', '--output', default='tf_exp.tsv',
+    parser.add_argument('-o', '--output', default='./input/tf_exp.tsv',
                         help='Summary of TF expression in tsv format')
     args = parser.parse_args()
 
