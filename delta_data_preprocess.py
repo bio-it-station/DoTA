@@ -19,14 +19,12 @@ def parse_options():
     parser = argparse.ArgumentParser(
         prog=__file__,
         usage='%(prog)s [Input/Output]',
-        description='''Generate delta data from CART-formatted data''')
+        description='Generate delta data from CART-formatted data')
 
     input_output = parser.add_argument_group('Input/Output')
-    input_output.add_argument(
-        '--i', metavar='<input-file>', help='CART-formatted data')
-    input_output.add_argument(
-        '--o', metavar='<output-dir>', default='./input/',
-        help='Output file directory (default=\'./input/\')')
+    input_output.add_argument('--i', metavar='<input-file>', help='CART-formatted data')
+    input_output.add_argument('--o', metavar='<output-dir>', default='./input/',
+                              help='Output file directory (default=\'./input/\')')
 
     return parser.parse_args()
 
@@ -82,10 +80,7 @@ def update_progress_bar(perc, option_info=None):
     :param perc: ratio of current run and whole cycle in percentage
     :option_info: alternative output format
     """
-    sys.stdout.write(
-        '[{:60}] {:.2f}%, {}\r'.format('=' * int(60 * perc // 100),
-                                       perc,
-                                       option_info))
+    sys.stdout.write('[{:60}] {:.2f}%, {}\r'.format('=' * int(60 * perc // 100), perc, option_info))
     sys.stdout.flush()
 
 

@@ -11,6 +11,7 @@ import pandas as pd
 from scipy.sparse import coo_matrix
 
 from delta_data_preprocess import delta_data_converter
+from utils import psi_z_score
 
 
 def parse_options():
@@ -22,27 +23,23 @@ def parse_options():
     parser = argparse.ArgumentParser(
         prog=__file__,
         usage='%(prog)s ([Input/Output]...) [Data format]...',
-        description='''Generate the feature and target data for machine-learning framework. \
-        The feature data converted from tf-promoter-peaks, and the target data from MISO-reported \
-        psi of first splicing event of each genes. The data will be converted by numpy and scipy \
-        into array for neural network (NN) or Classification And Regression Tree (CART).''')
+        description="""Generate the feature and target data for machine-learning framework.
+        The feature data converted from tf-promoter-peaks, and the target data from MISO-reported
+        psi of first splicing event of each genes. The data will be converted by numpy and scipy
+        into array for neural network (NN) or Classification And Regression Tree (CART).""")
 
     input_output = parser.add_argument_group('Input/Output')
-    input_output.add_argument(
-        '--f', metavar='<feature-dir>', default='./input/features/', help='Features files directory \
-        (default=\'./input/features/\')')
-    input_output.add_argument(
-        '--t', metavar='<target-dir>', default='./input/targets/', help='Targets files directory \
-        (default=\'./input/targets/\')')
-    input_output.add_argument(
-        '--w', metavar='<tf_weight>', help='TF weighting matrix files')
-    input_output.add_argument(
-        '--o', metavar='<output-dir>', default='./input/', help='Output file directory \
-        (default=\'./input/\')')
+    input_output.add_argument('--f', metavar='<feature-dir>', default='./input/features/',
+                              help='Features files directory (default=\'./input/features/\')')
+    input_output.add_argument('--t', metavar='<target-dir>', default='./input/targets/',
+                              help='Targets files directory (default=\'./input/targets/\')')
+    input_output.add_argument('--w', metavar='<tf_weight>', help='TF weighting matrix files')
+    input_output.add_argument('--o', metavar='<output-dir>', default='./input/',
+                              help='Output file directory (default=\'./input/\')')
 
     param = parser.add_argument_group('Parameters')
-    param.add_argument(
-        '-d', action="store_true", help='<Optional switch> Convert delta_data')
+    param.add_argument('-d', action='store_true', help='<Optional switch> Convert delta_data')
+    param.add_argument('-z', action='store_true', help='<Optional switch> Output z-score of PSI')
 
     # file_format = parser.add_argument_group('Data format')
     # file_format = file_format.add_mutually_exclusive_group(required=True)
@@ -117,10 +114,7 @@ def update_progress_bar(perc, option_info=None):
     :param perc: ratio of current run and whole cycle in percentage
     :option_info: alternative output format
     """
-    sys.stdout.write(
-        '[{:60}] {:.2f}%, {}\r'.format('=' * int(60 * perc // 100),
-                                       perc,
-                                       option_info))
+    sys.stdout.write('[{:60}] {:.2f}%, {}\r'.format('=' * int(60 * perc // 100), perc, option_info))
     sys.stdout.flush()
 
 
@@ -198,27 +192,27 @@ def main():
 
     # Convert data for NN or CART
     print('\n' + '-' * 60 + '\n')
-    print('Converting data...\n')
-
-    # if args.C:
+    print('Converting data...', end='')
     X = cart_data_converter(features_data, Y, Tf_list, Tf_weight)
-    filename = args.o + 'rf_data.pickle'
+    if args.z:
+        X, Y = psi_z_score(X, Y)
+    print('DONE!')
 
-    # else:
-    #     X = nn_data_converter(features_data, Y, Tf_list)
-    #     filename = args.o + 'nn_data.pickle'
-    print()
-
+    print('Saving converted data...')
+    filename = args.o + 'rf' + ('_zscore' if args.z else '') + '_data.pickle'
     output((X, Y['PSI'], Tf_list, Y[['Tissue', 'Gene']]), filename)
-
     print('File saved!')
 
     if args.d:
         print('\n' + '-' * 60 + '\n')
-        print('Converting delta data...')
+        print('Converting delta data...', end='')
+        delta_X, delta_Y = delta_data_converter(X, Y['PSI'], Tf_list, Y[['Tissue', 'Gene']])
+        if args.z:
+            delta_X, delta_Y = psi_z_score(delta_X, delta_Y)
+        print('DONE!')
 
-        X, Y = delta_data_converter(X, Y['PSI'], Tf_list, Y[['Tissue', 'Gene']])
-        filename = args.o + 'delta_data.pickle'
+        print('Saving converted delta data...')
+        filename = args.o + 'delta' + ('_zscore' if args.z else '') + '_data.pickle'
         output((X, Y, Tf_list), filename)
         print('Delta data coverting complete!')
 
