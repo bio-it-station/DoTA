@@ -206,9 +206,7 @@ def main():
     if args.d:
         print('\n' + '-' * 60 + '\n')
         print('Converting delta data...\n')
-        delta_X, delta_Y = delta_data_converter(X, Y['PSI'], Tf_list, Y[['Tissue', 'Gene']])
-        if args.z:
-            delta_X, delta_Y = psi_z_score(delta_X, delta_Y)
+        X, Y = delta_data_converter(X, Y['PSI'], Tf_list, Y[['Tissue', 'Gene']])
         print('\nDONE!')
 
         print('Saving converted delta data...')
