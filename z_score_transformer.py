@@ -2,7 +2,7 @@
 import argparse
 import pickle
 
-from utils import delta_data_converter, output
+from utils import delta_data_converter, output, psi_z_score
 
 
 def parse_options():
@@ -13,7 +13,7 @@ def parse_options():
     parser = argparse.ArgumentParser(
         prog=__file__,
         usage='%(prog)s [Input/Output]',
-        description='Generate delta data from CART-formatted data')
+        description='Do z-score transform from CART-formatted data')
 
     input_output = parser.add_argument_group('Input/Output')
     input_output.add_argument('--i', metavar='<input-file>', help='CART-formatted data')
@@ -27,14 +27,26 @@ def main():
     args = parse_options()
 
     with open(args.i, mode='rb') as fh:
-        X, Y, Tf_list = pickle.load(fh)
+        X, Y, Tf_list, Data_order = pickle.load(fh)
+
+    print('Performing Z-score transform...')
+    Y = Data_order.assign(PSI=Y)
+    X, Y = psi_z_score(X, Y)
+    print('Complete!')
+
+    print('Saving converted data...')
+    filename = args.o + 'zscore_data.pickle'
+    output((X, Y, Tf_list), filename)
+    print('Saved!')
 
     print('Converting delta data...')
     X, Y = delta_data_converter(X, Y, Tf_list)
-    print('Delta data coverting complete!')
+    print('Complete!')
 
-    filename = args.o + 'delta_data.pickle'
+    print('Saving converted delta data...')
+    filename = args.o + 'delta_zscore_data.pickle'
     output((X, Y, Tf_list), filename)
+    print('Saved!')
 
 
 if __name__ == '__main__':

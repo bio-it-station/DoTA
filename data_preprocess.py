@@ -1,17 +1,14 @@
 #!/usr/bin/env python3
 import argparse
-import errno
 import os
-import pickle
-import sys
 from collections import defaultdict
 
 import numpy as np
 import pandas as pd
 from scipy.sparse import coo_matrix
 
-from delta_data_preprocess import delta_data_converter
-from utils import psi_z_score
+from utils import (delta_data_converter, output, psi_z_score,
+                   update_progress_bar)
 
 
 def parse_options():
@@ -108,27 +105,6 @@ def nn_data_converter(features, y, tf_list):
     return x
 
 
-def update_progress_bar(perc, option_info=None):
-    """
-    update progress bar
-    :param perc: ratio of current run and whole cycle in percentage
-    :option_info: alternative output format
-    """
-    sys.stdout.write('[{:60}] {:.2f}%, {}\r'.format('=' * int(60 * perc // 100), perc, option_info))
-    sys.stdout.flush()
-
-
-def output(var, filename):
-    try:
-        os.makedirs(os.path.dirname(filename))
-    except OSError as err:
-        if err.errno != errno.EEXIST:
-            raise
-
-    with open(filename, mode='wb') as fh:
-        pickle.dump((var), fh)
-
-
 def main():
     args = parse_options()
 
@@ -187,8 +163,10 @@ def main():
     if args.w:
         Tf_weight = pd.read_table(args.w, index_col=0)
         Tf_weight = Tf_weight > 1
+        prefix = 'weight_'
     else:
         Tf_weight = pd.DataFrame(True, index=targets_tissue_list, columns=Tf_list)
+        prefix = ''
 
     # Convert data for NN or CART
     print('\n' + '-' * 60 + '\n')
@@ -199,18 +177,18 @@ def main():
         X, Y = psi_z_score(X, Y)
 
     print('Saving converted data...')
-    filename = args.o + 'rf' + ('_zscore' if args.z else '') + '_data.pickle'
-    output((X, Y['PSI'], Tf_list, Y[['Tissue', 'Gene']]), filename)
+    filename = args.o + prefix + 'rf' + ('_zscore' if args.z else '') + '_data.pickle'
+    output((X, Y, Tf_list), filename)
     print('File saved!')
 
     if args.d:
         print('\n' + '-' * 60 + '\n')
         print('Converting delta data...\n')
-        X, Y = delta_data_converter(X, Y['PSI'], Tf_list, Y[['Tissue', 'Gene']])
+        X, Y = delta_data_converter(X, Y, Tf_list)
         print('\nDONE!')
 
         print('Saving converted delta data...')
-        filename = args.o + 'delta' + ('_zscore' if args.z else '') + '_data.pickle'
+        filename = args.o + prefix + 'delta' + ('_zscore' if args.z else '') + '_data.pickle'
         output((X, Y, Tf_list), filename)
         print('Delta data coverting complete!')
 
