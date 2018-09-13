@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import pickle
+from os.path import basename
 
 from utils import delta_data_converter, output
 
@@ -29,11 +30,12 @@ def main():
     with open(args.i, mode='rb') as fh:
         X, Y, Tf_list = pickle.load(fh)
 
-    print('Converting delta data...')
     X, Y = delta_data_converter(X, Y, Tf_list)
-    print('Delta data coverting complete!')
 
-    filename = args.o + 'delta_data.pickle'
+    filename = basename(args.i)
+    prefix = filename.rstrip('rf_data.pickle')
+    datatype = 'delta_data'
+    filename = args.o + prefix + datatype + '.pickle'
     output((X, Y, Tf_list), filename)
 
 

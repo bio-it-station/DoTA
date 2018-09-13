@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import pickle
+from os.path import basename
 
 from utils import delta_data_converter, output, psi_z_score
 
@@ -29,23 +30,16 @@ def main():
     with open(args.i, mode='rb') as fh:
         X, Y, Tf_list = pickle.load(fh)
 
-    print('Performing Z-score transform...')
     X, Y = psi_z_score(X, Y)
-    print('Complete!')
-
-    print('Saving converted data...')
-    filename = args.o + 'zscore_data.pickle'
-    output((X, Y, Tf_list), filename)
-    print('Saved!')
-
-    print('Converting delta data...')
     X, Y = delta_data_converter(X, Y, Tf_list)
-    print('Complete!')
 
+    filename = basename(args.i)
+    prefix = filename.rstrip('rf_data.pickle')
+    datatype = 'delta_data'
     print('Saving converted delta data...')
-    filename = args.o + 'delta_zscore_data.pickle'
+    filename = args.o + prefix + datatype + '.pickle'
     output((X, Y, Tf_list), filename)
-    print('Saved!')
+    print('File saved!')
 
 
 if __name__ == '__main__':
