@@ -71,7 +71,7 @@ def delta_data_converter(x: np.ndarray, y: pd.Series, tf_list: list) -> Tuple[np
     for gene in genes.index:
         event_ind_list = y[y['Gene'] == gene].index
         for event_1, event_2 in combinations(event_ind_list, 2):
-            delta_psi = abs(y[event_1] - y[event_2])
+            delta_psi = abs(y.at[event_1, 'PSI'] - y.at[event_2, 'PSI'])
             if delta_psi:
                 delta_feature = x[event_1] ^ x[event_2]
             else:
