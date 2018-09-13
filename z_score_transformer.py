@@ -27,10 +27,9 @@ def main():
     args = parse_options()
 
     with open(args.i, mode='rb') as fh:
-        X, Y, Tf_list, Data_order = pickle.load(fh)
+        X, Y, Tf_list = pickle.load(fh)
 
     print('Performing Z-score transform...')
-    Y = Data_order.assign(PSI=Y)
     X, Y = psi_z_score(X, Y)
     print('Complete!')
 
