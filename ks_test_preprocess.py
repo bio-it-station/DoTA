@@ -3,9 +3,10 @@ import argparse
 import errno
 import os
 import pickle
-import sys
 
 import numpy as np
+
+from utils import update_progress_bar
 
 
 def parse_options():
@@ -27,19 +28,6 @@ def parse_options():
         help='Output file directory (default=\'./output/ks_test_preprocess/\')')
 
     return parser.parse_args()
-
-
-def update_progress_bar(perc, option_info=None):
-    """
-    update progress bar
-    :param perc: ratio of current run and whole cycle in percentage
-    :option_info: alternative output format
-    """
-    sys.stdout.write(
-        '[{:60}] {:.2f}%, {}\r'.format('=' * int(60 * perc // 100),
-                                       perc,
-                                       option_info))
-    sys.stdout.flush()
 
 
 def main():
