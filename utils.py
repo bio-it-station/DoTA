@@ -17,7 +17,8 @@ def psi_z_score(X: np.ndarray, Y: pd.DataFrame) -> Tuple[np.ndarray, pd.DataFram
     :param Y: Raw PSI value
     :return result: tuple of converted (X, Y)
     """
-    print('Convert PSI to z-score...', end='')
+    print('Performing Z-score transformation...\n')
+    print('Converting PSI to z-score...', end='')
     # remove genes with less than 2 tissue
     gene_count = Y.groupby('Gene')['PSI'].count()
     gene_list = gene_count[gene_count > 2].index
@@ -52,6 +53,7 @@ def delta_data_converter(x: np.ndarray, y: pd.Series, tf_list: list) -> Tuple[np
     :return x: new feature data in delta feature format
     :return y: new target data in delta target format
     """
+    print('Performing delta data convention...\n')
     gene_count = y.groupby('Gene').count()
     genes = gene_count[gene_count > 1].dropna()
 
