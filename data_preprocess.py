@@ -35,8 +35,8 @@ def parse_options():
                               help='Output file directory (default=\'./input/\')')
 
     param = parser.add_argument_group('Parameters')
-    param.add_argument('-d', action='store_true', help='<Optional switch> Convert delta_data')
     param.add_argument('-z', action='store_true', help='<Optional switch> Output z-score of PSI')
+    param.add_argument('-d', action='store_true', help='<Optional switch> Convert delta_data')
 
     # file_format = parser.add_argument_group('Data format')
     # file_format = file_format.add_mutually_exclusive_group(required=True)
@@ -172,25 +172,27 @@ def main():
     print('\n' + '-' * 60 + '\n')
     print('Converting data...')
     X = cart_data_converter(features_data, Y, Tf_list, Tf_weight)
+    datatype = 'rf_data'
     print('\nDONE!')
-    if args.z:
-        X, Y = psi_z_score(X, Y)
-
     print('Saving converted data...')
-    filename = args.o + prefix + 'rf' + ('_zscore' if args.z else '') + '_data.pickle'
+    # filename = args.o + prefix + 'rf' + ('_zscore' if args.z else '') + '_data.pickle'
+    filename = args.o + prefix + datatype + '.pickle'
     output((X, Y, Tf_list), filename)
     print('File saved!')
 
+    if args.z:
+        print('\n' + '-' * 60 + '\n')
+        X, Y = psi_z_score(X, Y)
+        prefix = prefix + 'zscore_'
+
     if args.d:
         print('\n' + '-' * 60 + '\n')
-        print('Converting delta data...\n')
         X, Y = delta_data_converter(X, Y, Tf_list)
-        print('\nDONE!')
-
+        datatype = 'delta_data'
         print('Saving converted delta data...')
-        filename = args.o + prefix + 'delta' + ('_zscore' if args.z else '') + '_data.pickle'
+        filename = args.o + prefix + datatype + '.pickle'
         output((X, Y, Tf_list), filename)
-        print('Delta data coverting complete!')
+        print('File saved!')
 
 
 if __name__ == '__main__':
