@@ -160,37 +160,38 @@ def main():
         exit(1)
 
     # Loading transcription factor weighting matrix file
+    prefix = []
     if args.w:
         Tf_weight = pd.read_table(args.w, index_col=0)
         Tf_weight = Tf_weight > 1
-        prefix = 'weight_'
+        prefix.append('weight')
     else:
         Tf_weight = pd.DataFrame(True, index=targets_tissue_list, columns=Tf_list)
-        prefix = ''
 
     # Convert data for NN or CART
     print('\n' + '-' * 60 + '\n')
     print('Converting data...')
     X = cart_data_converter(features_data, Y, Tf_list, Tf_weight)
-    datatype = 'rf_data'
     print('\nDONE!')
     print('Saving converted data...')
-    # filename = args.o + prefix + 'rf' + ('_zscore' if args.z else '') + '_data.pickle'
-    filename = args.o + prefix + datatype + '.pickle'
+    filename = args.o + '_'.join(prefix + ['rf_data']) + '.pickle'
     output((X, Y, Tf_list), filename)
     print('File saved!')
 
     if args.z:
         print('\n' + '-' * 60 + '\n')
         X, Y = psi_z_score(X, Y)
-        prefix = prefix + 'zscore_'
+        prefix.append('zscore')
+        print('Saving converted data...')
+        filename = args.o + '_'.join(prefix + ['rf_data']) + '.pickle'
+        output((X, Y, Tf_list), filename)
+        print('File saved!')
 
     if args.d:
         print('\n' + '-' * 60 + '\n')
         X, Y = delta_data_converter(X, Y, Tf_list)
-        datatype = 'delta_data'
         print('Saving converted delta data...')
-        filename = args.o + prefix + datatype + '.pickle'
+        filename = args.o + '_'.join(prefix + ['delta_data']) + '.pickle'
         output((X, Y, Tf_list), filename)
         print('File saved!')
 
