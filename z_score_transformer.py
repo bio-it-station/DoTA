@@ -34,7 +34,7 @@ def main():
     X, Y = delta_data_converter(X, Y, Tf_list)
 
     filename = basename(args.i)
-    prefix = filename.rstrip('rf_data.pickle')
+    prefix = filename[:-14] + 'zscore_'
     datatype = 'delta_data'
     print('Saving converted delta data...')
     filename = args.o + prefix + datatype + '.pickle'

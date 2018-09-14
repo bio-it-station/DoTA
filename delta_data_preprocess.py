@@ -33,7 +33,7 @@ def main():
     X, Y = delta_data_converter(X, Y, Tf_list)
 
     filename = basename(args.i)
-    prefix = filename.rstrip('rf_data.pickle')
+    prefix = filename[:-14]
     datatype = 'delta_data'
     filename = args.o + prefix + datatype + '.pickle'
     output((X, Y, Tf_list), filename)
