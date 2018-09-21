@@ -21,11 +21,9 @@ def parse_options():
         description='''Process delta data for ks-test''')
 
     input_output = parser.add_argument_group('Input/Output')
-    input_output.add_argument(
-        '--i', metavar='<input-file>', help='delta data')
-    input_output.add_argument(
-        '--o', metavar='<output-dir>', default='./output/ks_test_preprocess/',
-        help='Output file directory (default=\'./output/ks_test_preprocess/\')')
+    input_output.add_argument('--i', metavar='<input-file>', required=True, help='delta data')
+    input_output.add_argument('--o', metavar='<output-dir>', default='./output/ks_test_preprocess/',
+                              help='Output file directory (default=\'./output/ks_test_preprocess/\')')
 
     return parser.parse_args()
 
