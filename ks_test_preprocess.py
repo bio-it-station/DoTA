@@ -35,7 +35,7 @@ def main():
 
     with open(args.i, mode='rb') as fh:
         X, Y, Tf_list = pickle.load(fh)
-
+        Y = Y['PSI']
     try:
         os.makedirs(args.o)
     except OSError as err:
