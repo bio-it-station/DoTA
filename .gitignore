@@ -12,3 +12,6 @@
 !*/*.py
 !*/*.ipynb
 !*/*.R
+
+# editor
+.vscode/
