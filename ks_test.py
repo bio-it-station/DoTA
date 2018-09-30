@@ -6,11 +6,12 @@ import pickle
 
 import numpy as np
 import pandas as pd
+from joblib import Parallel, delayed
 from scipy.stats import ks_2samp
-
 from statsmodels.stats.multitest import multipletests
-from utils import update_progress_bar
+
 from plot import plot_cdf
+from utils import update_progress_bar
 
 
 def parse_options():
@@ -37,7 +38,7 @@ def main():
 
     with open(args.i, mode='rb') as fh:
         X, Y, Tf_list = pickle.load(fh)
-        Y = Y['PSI']
+        Y = Y['PSI'].values
     try:
         os.makedirs(args.o)
     except OSError as err:
@@ -49,6 +50,19 @@ def main():
     print('Converting delta data...')
     num_data = len(Tf_list)
     ks_result = {}
+
+    # # func to parallel
+    # def do_ks_test(idx: int, tf: str):
+    #     feature_0 = Y[np.where(X[:, idx] == 0)[0]]
+    #     feature_1 = Y[np.where(X[:, idx] == 1)[0]]
+    #     if feature_0.shape[0] and feature_1.shape[0]:
+    #         ks_result[tf] = ks_2samp(feature_0.values, feature_1.values)
+
+    # # create pool and exec
+    # Parallel(n_jobs=-1, require='sharedmem')(
+    #     delayed(do_ks_test)(idx, tf) for idx, tf in enumerate(Tf_list)
+    # )
+
     for idx, tf in enumerate(Tf_list):
         feature_0 = Y[np.where(X[:, idx] == 0)[0]]
         feature_1 = Y[np.where(X[:, idx] == 1)[0]]
