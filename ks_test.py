@@ -10,7 +10,7 @@ from scipy.stats import ks_2samp
 
 from statsmodels.stats.multitest import multipletests
 from utils import update_progress_bar
-from plot import cdf
+from plot import plot_cdf
 
 
 def parse_options():
@@ -61,7 +61,7 @@ def main():
 
         # Plot CDF
         filename = args.o + tf
-        plot_ks_test(feature_0, feature_1, filename)
+        plot_cdf(feature_0, feature_1, filename)
 
         idx += 1
         update_progress_bar(idx / num_data * 100, '{}/{}'.format(idx, num_data))
