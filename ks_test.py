@@ -3,7 +3,6 @@ import argparse
 import errno
 import os
 import pickle
-import matplotlib.pyplot as plt
 
 import numpy as np
 import pandas as pd
@@ -11,6 +10,7 @@ from scipy.stats import ks_2samp
 
 from statsmodels.stats.multitest import multipletests
 from utils import update_progress_bar
+from plot import cdf
 
 
 def parse_options():
@@ -58,14 +58,10 @@ def main():
 
         else:
             continue
-        
+
         # Plot CDF
-        label_0 = '0: {}'.format(len(feature_0))
-        label_1 = '1: {}'.format(len(feature_1))
-        plt.hist(feature_0, 1000, density=True, histtype='step', cumulative=True, label=label_0)
-        plt.hist(feature_1, 1000, density=True, histtype='step', cumulative=True, label=label_1)
-        plt.legend(loc='upper left')
-        plt.savefig('{}{}.png'.format(args.o, tf), dpi=300)
+        filename = args.o + tf
+        plot_ks_test(feature_0, feature_1, filename)
 
         idx += 1
         update_progress_bar(idx / num_data * 100, '{}/{}'.format(idx, num_data))
