@@ -77,6 +77,11 @@ def main():
             category = 'pass'
         else:
             category = 'not_pass'
+        try:
+            os.makedirs(args.o + category)
+        except OSError as err:
+            if err.errno != errno.EEXIST:
+                raise
         os.rename('{}{}.png'.format(args.o, tf), '{}{}/{}.png'.format(args.o, category, tf))
 
     print()
