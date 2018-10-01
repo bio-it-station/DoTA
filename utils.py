@@ -64,7 +64,7 @@ def delta_data_converter(x: np.ndarray, y: pd.Series, tf_list: list) -> Tuple[np
     esti_events_num = int(esti_events_num)
     print('estimated event numbers:', esti_events_num)
 
-    new_x = np.zeros((esti_events_num, len(tf_list)))
+    new_x = np.zeros((esti_events_num, len(tf_list)), dtype='bool')
     new_x[:] = np.nan
 
     # Fill the delta data into array
