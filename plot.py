@@ -1,5 +1,7 @@
 import pickle
 
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -23,6 +25,8 @@ def delta_data_boxplot(file_in: str, file_out: str) -> None:
     fig = sns.boxplot(x='delta_feature_sum', y='delta_psi', data=df)
     fig.tight_layout()
     fig.savefig(file_out, dpi=300)
+    plt.show()
+    plt.gcf().clear()
 
 
 def plot_cdf(samp_1, samp_2, file_out: str) -> None:
@@ -32,3 +36,5 @@ def plot_cdf(samp_1, samp_2, file_out: str) -> None:
     plt.hist(samp_2, 1000, density=True, histtype='step', cumulative=True, label=label_samp_2)
     plt.legend(loc='upper left')
     plt.savefig('{}.png'.format(file_out), dpi=300)
+    plt.show()
+    plt.gcf().clear()
