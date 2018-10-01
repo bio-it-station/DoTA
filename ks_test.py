@@ -1,17 +1,20 @@
 #!/usr/bin/env python3
 import argparse
 import errno
+import gc
 import os
 import pickle
+import shutil
+import sys
+import tempfile
 
 import numpy as np
 import pandas as pd
-from joblib import Parallel, delayed
+from joblib import Parallel, delayed, dump, load
 from scipy.stats import ks_2samp
 from statsmodels.stats.multitest import multipletests
 
 from plot import plot_cdf
-from utils import update_progress_bar
 
 
 def parse_options():
@@ -48,37 +51,52 @@ def main():
     np.set_printoptions(precision=3, suppress=True)
 
     print('Converting delta data...')
-    num_data = len(Tf_list)
     ks_result = {}
 
-    # # func to parallel
-    # def do_ks_test(idx: int, tf: str):
-    #     feature_0 = Y[np.where(X[:, idx] == 0)[0]]
-    #     feature_1 = Y[np.where(X[:, idx] == 1)[0]]
-    #     if feature_0.shape[0] and feature_1.shape[0]:
-    #         ks_result[tf] = ks_2samp(feature_0.values, feature_1.values)
+    # create memmap file in tmpfs
+    DEFAULT_TMP_FILE = '/dev/shm'
+    # try to use temp folder on tmpfs (/dev/shm)
+    temp_folder = DEFAULT_TMP_FILE if os.path.exists(DEFAULT_TMP_FILE) else tempfile.gettempdir()
+    try:
+        pool_tmp = tempfile.mkdtemp(dir=temp_folder)
+        # load X to mmap
+        fname = os.path.join(pool_tmp, 'X.mmap')
+        dump(X, fname)
+        X_memmap = load(fname, mmap_mode='r')
+        # load Y to mmap
+        fname = os.path.join(pool_tmp, 'Y.mmap')
+        dump(Y, fname)
+        Y_memmap = load(fname, mmap_mode='r')
+    except (IOError, OSError):
+        print('failed to open temp file on ' + temp_folder, file=sys.stderr)
+        exit(1)
+    # delete original array to reduce memory usage
+    del X, Y
+    gc.collect()
+    # set OPENBLAS_NUM_THREADS=1 to prevent over-subscription
+    os.environ['OPENBLAS_NUM_THREADS'] = '1'
 
-    # # create pool and exec
-    # Parallel(n_jobs=-1, require='sharedmem')(
-    #     delayed(do_ks_test)(idx, tf) for idx, tf in enumerate(Tf_list)
-    # )
-
-    for idx, tf in enumerate(Tf_list):
+    def do_ks_test(X, Y, idx, tf, output_file):
         feature_0 = Y[np.where(X[:, idx] == 0)[0]]
         feature_1 = Y[np.where(X[:, idx] == 1)[0]]
-
         if feature_0.shape[0] and feature_1.shape[0]:
-            ks_result[tf] = ks_2samp(feature_0.values, feature_1.values)
+            plot_cdf(feature_0, feature_1, output_file)
+            return tf, ks_2samp(feature_0, feature_1)
+        return None
 
-        else:
-            continue
+    # create pool and exec
+    results = Parallel(n_jobs=-1)(
+        delayed(do_ks_test)(
+            X_memmap, Y_memmap, idx, tf, args.o + tf
+        ) for idx, tf in enumerate(Tf_list)
+    )
+    ks_result = {result[0]: result[1] for result in results if result if not None}
 
-        # Plot CDF
-        filename = args.o + tf
-        plot_cdf(feature_0, feature_1, filename)
-
-        idx += 1
-        update_progress_bar(idx / num_data * 100, '{}/{}'.format(idx, num_data))
+    # cleanup
+    try:
+        shutil.rmtree(pool_tmp)
+    except (IOError, OSError):
+        print('failed to clean-up mmep automatically', file=sys.stderr)
 
     # Convert to pd.dataframe and do pval correction
     df = pd.DataFrame.from_dict(ks_result, orient='index')
@@ -98,8 +116,7 @@ def main():
                 raise
         os.rename('{}{}.png'.format(args.o, tf), '{}{}/{}.png'.format(args.o, category, tf))
 
-    print()
-    print('ks-test complete!')
+    print('\nks-test complete!')
 
 
 if __name__ == '__main__':
