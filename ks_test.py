@@ -15,6 +15,7 @@ from scipy.stats import ks_2samp
 from statsmodels.stats.multitest import multipletests
 
 from plot import plot_cdf
+from utils import _getThreads
 
 
 def parse_options():
@@ -33,7 +34,21 @@ def parse_options():
     input_output.add_argument('--o', metavar='<output-dir>', default='./output/ks_test/',
                               help='Output file directory (default=\'./output/ks_test/\')')
 
+    param = parser.add_argument_group('Parameters')
+    threads = _getThreads()
+    param.add_argument('--p', choices=range(1, threads + 1), metavar='<parallel>', type=int, default='1',
+                       help='Number of threads to use (range: 1~{}, default=1)'.format(threads))
+
     return parser.parse_args()
+
+
+def do_ks_test(X, Y, idx, tf, output_file):
+    feature_0 = Y[np.where(X[:, idx] == 0)[0]]
+    feature_1 = Y[np.where(X[:, idx] == 1)[0]]
+    if feature_0.shape[0] and feature_1.shape[0]:
+        plot_cdf(feature_0, feature_1, output_file)
+        return tf, ks_2samp(feature_0, feature_1)
+    return None
 
 
 def main():
@@ -51,43 +66,33 @@ def main():
     np.set_printoptions(precision=3, suppress=True)
 
     print('Converting delta data...')
-    ks_result = {}
 
-    # create memmap file in tmpfs
-    DEFAULT_TMP_FILE = '/dev/shm'
-    # try to use temp folder on tmpfs (/dev/shm)
-    temp_folder = DEFAULT_TMP_FILE if os.path.exists(DEFAULT_TMP_FILE) else tempfile.gettempdir()
-    try:
-        pool_tmp = tempfile.mkdtemp(dir=temp_folder)
-        # load X to mmap
-        fname = os.path.join(pool_tmp, 'X.mmap')
-        dump(X, fname)
-        X_memmap = load(fname, mmap_mode='r')
-        # load Y to mmap
-        fname = os.path.join(pool_tmp, 'Y.mmap')
-        dump(Y, fname)
-        Y_memmap = load(fname, mmap_mode='r')
-    except (IOError, OSError):
-        print('failed to open temp file on ' + temp_folder, file=sys.stderr)
-        exit(1)
-    # delete original array to reduce memory usage
-    del X, Y
-    gc.collect()
-    # set OPENBLAS_NUM_THREADS=1 to prevent over-subscription
-    os.environ['OPENBLAS_NUM_THREADS'] = '1'
-
-    def do_ks_test(X, Y, idx, tf, output_file):
-        feature_0 = Y[np.where(X[:, idx] == 0)[0]]
-        feature_1 = Y[np.where(X[:, idx] == 1)[0]]
-        if feature_0.shape[0] and feature_1.shape[0]:
-            plot_cdf(feature_0, feature_1, output_file)
-            return tf, ks_2samp(feature_0, feature_1)
-        return None
+    if args.p > 1:
+        # create memmap file in tmpfs
+        DEFAULT_TMP_FILE = '/dev/shm'
+        # try to use temp folder on tmpfs (/dev/shm)
+        temp_folder = DEFAULT_TMP_FILE if os.path.exists(DEFAULT_TMP_FILE) else tempfile.gettempdir()
+        try:
+            pool_tmp = tempfile.mkdtemp(dir=temp_folder)
+            # load X to mmap
+            fname = os.path.join(pool_tmp, 'X.mmap')
+            dump(X, fname)
+            X = load(fname, mmap_mode='r')
+            # load Y to mmap
+            fname = os.path.join(pool_tmp, 'Y.mmap')
+            dump(Y, fname)
+            Y = load(fname, mmap_mode='r')
+            gc.collect()
+            # set OPENBLAS_NUM_THREADS=1 to prevent over-subscription
+            os.environ['OPENBLAS_NUM_THREADS'] = '1'
+        except (IOError, OSError):
+            print('failed to open temp file on ' + temp_folder, file=sys.stderr)
+            args.p = 1
 
     # create pool and exec
-    results = Parallel(n_jobs=-1)(
+    results = Parallel(n_jobs=args.p)(
         delayed(do_ks_test)(
-            X_memmap, Y_memmap, idx, tf, args.o + tf
+            X, Y, idx, tf, args.o + tf
         ) for idx, tf in enumerate(Tf_list)
     )
     ks_result = {result[0]: result[1] for result in results if result if not None}
@@ -103,12 +108,12 @@ def main():
     df['adj_pval'] = multipletests(df.pvalue, alpha=0.05, method='bonferroni')[1]
     df.to_csv(args.o + 'ks_test.csv')
 
-    # Move the CDF plots to pass or not_pass subdirectory depending on its adj_pval
+    # Move the CDF plots to accept or reject subdirectory depending on its adj_pval
     for tf, row in df.iterrows():
         if row.adj_pval < 1e-30:
-            category = 'pass'
+            category = 'accept'
         else:
-            category = 'not_pass'
+            category = 'reject'
         try:
             os.makedirs(args.o + category)
         except OSError as err:

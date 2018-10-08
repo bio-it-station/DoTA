@@ -10,6 +10,13 @@ import pandas as pd
 from scipy.special import comb
 
 
+def _getThreads():
+    """ Returns the number of available threads on a posix/win based system """
+    if sys.platform == 'win32':
+        return (int)(os.environ['NUMBER_OF_PROCESSORS'])
+    return (int)(os.popen('grep -c cores /proc/cpuinfo').read())
+
+
 def psi_z_score(X: np.ndarray, Y: pd.DataFrame) -> Tuple[np.ndarray, pd.DataFrame]:
     """
     Convert raw PSI to z-score
@@ -64,7 +71,7 @@ def delta_data_converter(x: np.ndarray, y: pd.Series, tf_list: list) -> Tuple[np
     esti_events_num = int(esti_events_num)
     print('estimated event numbers:', esti_events_num)
 
-    new_x = np.zeros((esti_events_num, len(tf_list)), dtype='bool')
+    new_x = np.zeros((esti_events_num, len(tf_list)))
     new_x[:] = np.nan
 
     # Fill the delta data into array
@@ -87,7 +94,7 @@ def delta_data_converter(x: np.ndarray, y: pd.Series, tf_list: list) -> Tuple[np
                 update_progress_bar(i / esti_events_num * 100, '{}/{}'.format(i, esti_events_num))
     update_progress_bar(100, '{}/{}'.format(i, i))
     print('\nEvents processed: {} , DONE'.format(i))
-    x = new_x[~np.isnan(new_x).any(axis=1)]
+    x = new_x[~np.isnan(new_x).any(axis=1)].astype('bool')
     y = pd.DataFrame(data={'PSI': new_y_dpsi, 'Gene': new_y_gene})
     y['Gene'] = y['Gene'].astype('category')
 
