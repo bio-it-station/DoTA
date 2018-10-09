@@ -46,7 +46,8 @@ def do_ks_test(X, Y, idx, tf, output_file):
     feature_0 = Y[np.where(X[:, idx] == 0)[0]]
     feature_1 = Y[np.where(X[:, idx] == 1)[0]]
     if feature_0.shape[0] and feature_1.shape[0]:
-        plot_cdf(feature_0, feature_1, output_file)
+        data = (feature_0, feature_1)
+        plot_cdf(data, output_file)
         return tf, ks_2samp(feature_0, feature_1)
     return None
 
@@ -65,7 +66,7 @@ def main():
 
     np.set_printoptions(precision=3, suppress=True)
 
-    print('Converting delta data...')
+    print('Progressing Ks-test and CDF plots...')
 
     if args.p > 1:
         # create memmap file in tmpfs
@@ -96,6 +97,7 @@ def main():
         ) for idx, tf in enumerate(Tf_list)
     )
     ks_result = {result[0]: result[1] for result in results if result if not None}
+    print('\nks-test complete!')
 
     # cleanup
     try:
@@ -109,6 +111,7 @@ def main():
     df.to_csv(args.o + 'ks_test.csv')
 
     # Move the CDF plots to accept or reject subdirectory depending on its adj_pval
+    print('\nMoving files to corresponding folder...')
     for tf, row in df.iterrows():
         if row.adj_pval < 1e-30:
             category = 'accept'
@@ -121,7 +124,7 @@ def main():
                 raise
         os.rename('{}{}.png'.format(args.o, tf), '{}{}/{}.png'.format(args.o, category, tf))
 
-    print('\nks-test complete!')
+    print('\nComplete!')
 
 
 if __name__ == '__main__':
