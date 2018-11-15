@@ -45,7 +45,6 @@ psi_data.dropna(inplace=True)
 # Set color code for different groups
 psi_data['color'] = 'tab:blue'
 psi_data.loc[(psi_data['psi_scaled'] > 0.5), 'color'] = 'tab:red'
-psi_data.dropna(inplace=True)
 positive_group = psi_data.groupby('color').count()['sample'][0]
 negative_group = psi_data.groupby('color').count()['sample'][1]
 total_remain = positive_group + negative_group
