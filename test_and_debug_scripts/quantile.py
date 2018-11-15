@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 import pickle
+from itertools import combinations
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -22,6 +23,10 @@ psi_stdev = psi_stdev[keep_idx]
 psi_mean = psi_df.mean(axis=1)
 # Sort by PSI mean
 psi_df = psi_df.loc[psi_mean.sort_values().index]
+idx_df = y.sort_values(by=['Gene', 'Tissue']).reset_index().pivot(
+    index='Gene', columns='Tissue')['index']
+idx_df = idx_df.loc[psi_mean.sort_values().index]  # sort gene by PSI mean
+orig_idx = idx_df.reset_index(drop=True).T.melt()['value']
 # Z-score
 zpsi_df = psi_df.apply(lambda x: (x - psi_mean[x.name]) / psi_stdev[x.name], axis=1)
 # Do data scaling (linear scaling to [0,1])
@@ -35,6 +40,8 @@ psi_scaled = pd.DataFrame(data_scaled)
 psi_data = zpsi_df.reset_index(drop=True).T.melt(var_name='sample', value_name='zpsi')
 psi_data['psi'] = psi_df.reset_index(drop=True).T.melt(var_name='sample')['value']
 psi_data['psi_scaled'] = psi_scaled.reset_index(drop=True).T.melt(var_name='sample')['value']
+psi_data['idx'] = orig_idx
+psi_data.dropna(inplace=True)
 # Set color code for different groups
 psi_data['color'] = 'tab:blue'
 psi_data.loc[(psi_data['psi_scaled'] > 0.5), 'color'] = 'tab:red'
@@ -89,3 +96,8 @@ with sns.axes_style("darkgrid"):
     fig.tight_layout()
     fig.savefig('psi_data_points_stat.png', dpi=300)
     plt.show()
+x_data_filtered = x_data[psi_data['idx'].astype(int)]
+y_filtered = y.iloc[psi_data['idx'].astype(int)].reset_index(drop=True)
+y_filtered['ZPSI'] = psi_data.reset_index()['zpsi']
+with open('human_weight_rf_data_filtered_quantile.pickle', mode='wb') as fh:
+    pickle.dump((x_data_filtered, y_filtered, tf_list), fh)
