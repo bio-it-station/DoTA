@@ -2,6 +2,7 @@ import errno
 import os
 import pickle
 import sys
+from abc import ABC, abstractmethod
 from itertools import combinations
 from typing import Tuple
 
@@ -50,7 +51,67 @@ def psi_z_score(X: np.ndarray, Y: pd.DataFrame) -> Tuple[np.ndarray, pd.DataFram
     return X, Y
 
 
-def delta_data_converter(x: np.ndarray, y: pd.DataFrame, tf_list: list) -> Tuple[np.ndarray, np.ndarray]:
+class _DeltaConverter(ABC):
+    """Basal Class of Delta data converter"""
+    def __init__(self, x: np.ndarray, y: pd.DataFrame, tf_list: list):
+        self.x = x
+        self.y = y
+        self.tf_list = tf_list
+        gene_count = self.y.groupby('Gene').count()
+        self.genes = gene_count[gene_count > 1].dropna()
+        self.new_x = None
+        self.new_y = None
+
+    def convert(self) -> Tuple[np.ndarray, pd.DataFrame]:
+        print('Performing delta data convention...\n')
+
+        # Create an nan array with estimated event numbers as new features array
+        esti_events_num = 0
+        for num in self.genes['Tissue']:
+            esti_events_num += comb(num, 2)
+        esti_events_num = int(esti_events_num)
+        print('estimated event numbers:', esti_events_num)
+
+        self.new_x = np.zeros((esti_events_num, len(self.tf_list)))
+        self.new_x[:] = np.nan
+
+        self.classifier()
+        self.new_x = self.new_x[~np.isnan(self.new_x).any(axis=1)].astype('bool')
+        self.new_y['Gene'] = self.new_y['Gene'].astype('category')
+
+        return self.new_x, self.new_y
+
+    @abstractmethod
+    def classifier(self):
+        pass
+
+class QuantDeltaConverter(_DeltaConverter):
+    """Apply Quntaile categorize 20%"""
+    def classifier(self):
+        i = 0
+        new_y_dpsi = []
+        new_y_gene = []
+        new_psi_group = []
+        for gene in self.genes.index:
+            event_ind_list = self.y[self.y['Gene'] == gene].index
+            for event_1, event_2 in combinations(event_ind_list, 2):
+                # delta_psi = abs(y.at[event_1, 'PSI'] - y.at[event_2, 'PSI'])
+                delta_psi = abs(self.y.at[event_1, 'ZPSI'] - self.y.at[event_2, 'ZPSI'])
+                if delta_psi:
+                    delta_feature = self.x[event_1] ^ self.x[event_2]
+                    delta_psi_group = self.y.at[event_1, 'psi_group'] ^ self.y.at[event_2, 'psi_group']
+                else:
+                    continue
+                self.new_x[i] = delta_feature
+                new_y_dpsi.append(delta_psi)
+                new_psi_group.append(delta_psi_group)
+                new_y_gene.append(gene)
+                i += 1
+        self.new_y = pd.DataFrame(data={'PSI': new_y_dpsi, 'Gene': new_y_gene, 'psi_group': new_psi_group})
+        self.new_y['psi_group'] = self.new_y['psi_group'].astype('category')
+
+
+def delta_data_converter(x: np.ndarray, y: pd.DataFrame, tf_list: list) -> Tuple[np.ndarray, pd.DataFrame]:
     """
     Generate data for NN (with position information)
     :param x: feature data for CART model
