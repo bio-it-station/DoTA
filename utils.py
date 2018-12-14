@@ -50,7 +50,7 @@ def psi_z_score(X: np.ndarray, Y: pd.DataFrame) -> Tuple[np.ndarray, pd.DataFram
     return X, Y
 
 
-def delta_data_converter(x: np.ndarray, y: pd.Series, tf_list: list) -> Tuple[np.ndarray, np.ndarray]:
+def delta_data_converter(x: np.ndarray, y: pd.DataFrame, tf_list: list) -> Tuple[np.ndarray, np.ndarray]:
     """
     Generate data for NN (with position information)
     :param x: feature data for CART model
@@ -78,24 +78,47 @@ def delta_data_converter(x: np.ndarray, y: pd.Series, tf_list: list) -> Tuple[np
     i = 0
     new_y_dpsi = []
     new_y_gene = []
-    for gene in genes.index:
-        event_ind_list = y[y['Gene'] == gene].index
-        for event_1, event_2 in combinations(event_ind_list, 2):
-            delta_psi = abs(y.at[event_1, 'PSI'] - y.at[event_2, 'PSI'])
-            if delta_psi:
-                delta_feature = x[event_1] ^ x[event_2]
-            else:
-                continue
-            new_x[i] = delta_feature
-            new_y_dpsi.append(delta_psi)
-            new_y_gene.append(gene)
-            i += 1
-            if i % 1000 == 0:
-                update_progress_bar(i / esti_events_num * 100, '{}/{}'.format(i, esti_events_num))
+    if 'psi_group' in y.columns:
+        new_psi_group = []
+        for gene in genes.index:
+            event_ind_list = y[y['Gene'] == gene].index
+            for event_1, event_2 in combinations(event_ind_list, 2):
+                # delta_psi = abs(y.at[event_1, 'PSI'] - y.at[event_2, 'PSI'])
+                delta_psi = abs(y.at[event_1, 'ZPSI'] - y.at[event_2, 'ZPSI'])
+                if delta_psi:
+                    delta_feature = x[event_1] ^ x[event_2]
+                    delta_psi_group = y.at[event_1, 'psi_group'] ^ y.at[event_2, 'psi_group']
+                else:
+                    continue
+                new_x[i] = delta_feature
+                new_y_dpsi.append(delta_psi)
+                new_psi_group.append(delta_psi_group)
+                new_y_gene.append(gene)
+                i += 1
+                if i % 1000 == 0:
+                    update_progress_bar(i / esti_events_num * 100, '{}/{}'.format(i, esti_events_num))
+        y = pd.DataFrame(data={'PSI': new_y_dpsi, 'Gene': new_y_gene, 'psi_group': new_psi_group})
+        y['psi_group'] = y['psi_group'].astype('category')
+    else:
+        for gene in genes.index:
+            event_ind_list = y[y['Gene'] == gene].index
+            for event_1, event_2 in combinations(event_ind_list, 2):
+                # delta_psi = abs(y.at[event_1, 'PSI'] - y.at[event_2, 'PSI'])
+                delta_psi = abs(y.at[event_1, 'ZPSI'] - y.at[event_2, 'ZPSI'])
+                if delta_psi:
+                    delta_feature = x[event_1] ^ x[event_2]
+                else:
+                    continue
+                new_x[i] = delta_feature
+                new_y_dpsi.append(delta_psi)
+                new_y_gene.append(gene)
+                i += 1
+                if i % 1000 == 0:
+                    update_progress_bar(i / esti_events_num * 100, '{}/{}'.format(i, esti_events_num))
+        y = pd.DataFrame(data={'PSI': new_y_dpsi, 'Gene': new_y_gene})
     update_progress_bar(100, '{}/{}'.format(i, i))
     print('\nEvents processed: {} , DONE'.format(i))
     x = new_x[~np.isnan(new_x).any(axis=1)].astype('bool')
-    y = pd.DataFrame(data={'PSI': new_y_dpsi, 'Gene': new_y_gene})
     y['Gene'] = y['Gene'].astype('category')
 
     return x, y
