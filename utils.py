@@ -8,8 +8,9 @@ from typing import Tuple
 
 import numpy as np
 import pandas as pd
-from scipy.special import comb
 from scipy.sparse import issparse
+from scipy.special import comb
+from sklearn.preprocessing import MinMaxScaler
 
 
 def _getThreads():
@@ -109,6 +110,45 @@ def psi_z_score(y: pd.DataFrame) -> Tuple[np.ndarray, pd.DataFrame]:
     return y
 
 
+def quantile_convert(x, y):
+    # Create psi table
+    psi_df = y.pivot(index='Gene', columns='Tissue')['PSI']
+    # Do data scaling (linear scaling to [0,1])
+    data = psi_df.values.copy()
+    row_mean = np.nanmean(data, axis=1)
+    idx = np.where(np.isnan(data))
+    data[idx] = np.take(row_mean, idx[0])
+    scaler = MinMaxScaler()
+    data_scaled = scaler.fit_transform(data.T).T
+    data[idx] = np.nan
+    data_scaled[idx] = np.nan
+    # set 20% ~ 80% to NaN
+    data_scaled[(data_scaled > 0.2) & (data_scaled < 0.8)] = np.nan
+    psi_scaled = pd.DataFrame(data_scaled, columns=psi_df.columns, index=psi_df.index)
+    # Z-score
+    psi_mean = psi_df.mean(axis=1)
+    psi_stdev = psi_df.std(axis=1)
+    zpsi_df = psi_df.apply(lambda x: (x - psi_mean[x.name]) / psi_stdev[x.name], axis=1)
+    # save original idx
+    idx_df = y.reset_index().pivot(index='Gene', columns='Tissue')['index']
+    orig_idx = idx_df.reset_index(drop=True).T.melt()['value']
+    # collect all information
+    psi_data = zpsi_df.reset_index(drop=True).T.melt(var_name='sample', value_name='zpsi')
+    psi_data['psi'] = psi_df.reset_index(drop=True).T.melt(var_name='sample')['value']
+    psi_data['psi_scaled'] = psi_scaled.reset_index(drop=True).T.melt(var_name='sample')['value']
+    psi_data['idx'] = orig_idx
+    psi_data.dropna(inplace=True)
+    # divied into two group
+    psi_data['psi_group'] = False
+    psi_data.loc[psi_data['psi_scaled'] > 0.5, 'psi_group'] = True
+    # filter original data
+    x = x[psi_data['idx'].astype(int)]
+    y = y.iloc[psi_data['idx'].astype(int)].reset_index(drop=True)
+    y['ZPSI'] = psi_data.reset_index()['zpsi']
+    y['psi_group'] = psi_data.reset_index()['psi_group']
+    return x, y
+
+
 class _DeltaConverter(ABC):
     """Basal Class of Delta data converter"""
 
@@ -168,8 +208,7 @@ class QuantDeltaConverter(_DeltaConverter):
                     self.y.at[event_1, 'ZPSI'] - self.y.at[event_2, 'ZPSI'])
                 if delta_psi:
                     delta_feature = self.x[event_1] ^ self.x[event_2]
-                    delta_psi_group = self.y.at[event_1,
-                                                'psi_group'] ^ self.y.at[event_2, 'psi_group']
+                    delta_psi_group = self.y.at[event_1, 'psi_group'] ^ self.y.at[event_2, 'psi_group']
                 else:
                     continue
                 self.new_x[i] = delta_feature
@@ -203,8 +242,7 @@ class QuantDeltaConverter_sparse(_DeltaConverter):
                     self.y.at[event_1, 'ZPSI'] - self.y.at[event_2, 'ZPSI'])
                 if delta_psi:
                     delta_feature = self.x[event_1] - self.x[event_2]
-                    delta_psi_group = self.y.at[event_1,
-                                                'psi_group'] ^ self.y.at[event_2, 'psi_group']
+                    delta_psi_group = self.y.at[event_1, 'psi_group'] ^ self.y.at[event_2, 'psi_group']
                 else:
                     continue
                 self.new_x[i] = delta_feature
