@@ -62,7 +62,7 @@ def filter_less_than_3(x, y):
     psi_df = y.pivot(index='Gene', columns='Tissue')['PSI']
 
     # Calculate stdev
-    psi_stdev = psi_df.std(axis=1, ddof=0)
+    psi_stdev = psi_df.std(axis=1)
 
     # Drop genes with no stdev across different tissues
     keep_gene = psi_stdev[psi_stdev != 0].index

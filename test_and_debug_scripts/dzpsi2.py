@@ -27,7 +27,7 @@ with open('/home/chenghung/DoTA/input/rf_data/human_weight_rf_data_filtered.pick
 # Create psi table
 psi_df = y.pivot(index='Gene', columns='Tissue')['PSI']
 # Calculate stdev
-psi_stdev = psi_df.std(axis=1, ddof=0)
+psi_stdev = psi_df.std(axis=1)
 # Drop genes with no stdev across different tissues
 keep_idx = psi_stdev[psi_stdev != 0].index
 psi_df = psi_df.loc[keep_idx]
