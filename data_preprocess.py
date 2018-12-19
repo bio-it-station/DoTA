@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 from scipy.sparse import coo_matrix
 
-from utils import (delta_data_converter, output, psi_z_score,
+from utils import (output, psi_z_score,
                    update_progress_bar)
 
 
@@ -30,20 +30,21 @@ def parse_options():
                               help='Features files directory (default=\'./input/features/\')')
     input_output.add_argument('--t', metavar='<target-dir>', default='./input/targets/',
                               help='Targets files directory (default=\'./input/targets/\')')
-    input_output.add_argument('--w', metavar='<tf_weight>', help='TF weighting matrix files')
+    input_output.add_argument(
+        '--w', metavar='<tf_weight>', help='TF weighting matrix files')
     input_output.add_argument('--o', metavar='<output-dir>', default='./input/',
                               help='Output file directory (default=\'./input/\')')
 
-    param = parser.add_argument_group('Parameters')
-    param.add_argument('-z', action='store_true', help='<Optional switch> Output z-score of PSI')
-    param.add_argument('-d', action='store_true', help='<Optional switch> Convert delta_data')
+    # param = parser.add_argument_group('Parameters')
+    # param.add_argument('-z', action='store_true', help='<Optional switch> Output z-score of PSI')
+    # param.add_argument('-d', action='store_true', help='<Optional switch> Convert delta_data')
 
-    # file_format = parser.add_argument_group('Data format')
-    # file_format = file_format.add_mutually_exclusive_group(required=True)
-    # file_format.add_argument(
-    #     '-C', action='store_true', help='<Switch> Genarate feature data in CART format')
-    # file_format.add_argument(
-    #     '-N', action='store_true', help='<Switch> Generate feature data in NN format')
+    file_format = parser.add_argument_group('Data format')
+    file_format = file_format.add_mutually_exclusive_group(required=True)
+    file_format.add_argument(
+        '-C', action='store_true', help='<Switch> Genarate feature data in CART format')
+    file_format.add_argument(
+        '-N', action='store_true', help='<Switch> Generate feature data in NN format')
 
     return parser.parse_args()
 
@@ -68,12 +69,13 @@ def cart_data_converter(features, y, tf_list, tf_weight=None):
                 x[i][j] = tf_weight.at[tissue, tf]
         i += 1
         if i == num_data or i % 1000 == 0:
-            update_progress_bar(i / num_data * 100, '{}/{}'.format(i, num_data))
+            update_progress_bar(i / num_data * 100,
+                                '{}/{}'.format(i, num_data))
 
     return x
 
 
-def nn_data_converter(features, y, tf_list):
+def nn_data_converter(features, y, tf_list, tf_weight=None):
     """
     Generate data for NN (with position information)
     :param features: features from dhs_peaks + tf_motifs + promoter region
@@ -88,6 +90,8 @@ def nn_data_converter(features, y, tf_list):
 
     for i, [gene, _, tissue] in enumerate(y.values):
         for j, tf in enumerate(tf_list):
+            if not tf_weight.at[tissue, tf]:
+                continue
             full_id = tissue + gene + tf
             if full_id in features:
                 for tfbs in features[full_id]:
@@ -96,10 +100,12 @@ def nn_data_converter(features, y, tf_list):
                     row += [i * num_tf + j] * len(pos)
         i += 1
         if i == num_data or i % 1000 == 0:
-            update_progress_bar(i / num_data * 100, '{}/{}'.format(i, num_data))
+            update_progress_bar(i / num_data * 100,
+                                '{}/{}'.format(i, num_data))
 
     data = [True] * len(row)
-    x = coo_matrix((data, (row, col)), shape=(num_data * num_tf, 2500), dtype='bool')
+    x = coo_matrix((data, (row, col)), shape=(
+        num_data * num_tf, 2500), dtype='bool')
     x = x.tocsr()
 
     return x
@@ -149,7 +155,8 @@ def main():
                     col = line.rstrip().split()
                     Gene_list.add(col[0])
                     Tf_list.add(col[3])
-                    features_data[tissue_name + col[0] + col[3]].append((int(col[1]), int(col[2])))
+                    features_data[tissue_name + col[0] + col[3]
+                                  ].append((int(col[1]), int(col[2])))
             print('DONE!')
 
     Tf_list = sorted(Tf_list)
@@ -164,36 +171,45 @@ def main():
     if args.w:
         Tf_weight = pd.read_table(args.w, index_col=0)
         Tf_weight = Tf_weight > 1
+        # Remove tf with no expression in all tissues
+        for i in Tf_weight.columns[(Tf_weight == 0).all(axis=0)]:
+            Tf_list.remove(i)
+        Tf_weight = Tf_weight.loc[:, (Tf_weight != 0).any(axis=0)]
         prefix.append('weight')
     else:
-        Tf_weight = pd.DataFrame(True, index=targets_tissue_list, columns=Tf_list)
+        Tf_weight = pd.DataFrame(
+            True, index=targets_tissue_list, columns=Tf_list)
 
     # Convert data for NN or CART
     print('\n' + '-' * 60 + '\n')
     print('Converting data...')
-    X = cart_data_converter(features_data, Y, Tf_list, Tf_weight)
+    if args.C:
+        X = cart_data_converter(features_data, Y, Tf_list, Tf_weight)
+        filename = args.o + '_'.join(prefix + ['rf_data']) + '.pickle'
+    else:
+        X = nn_data_converter(features_data, Y, Tf_list, Tf_weight)
+        filename = args.o + '_'.join(prefix + ['nn']) + '.pickle'
     print('\nDONE!')
     print('Saving converted data...')
-    filename = args.o + '_'.join(prefix + ['rf_data']) + '.pickle'
     output((X, Y, Tf_list), filename)
     print('File saved!')
 
-    if args.z:
-        print('\n' + '-' * 60 + '\n')
-        X, Y = psi_z_score(X, Y)
-        prefix.append('zscore')
-        print('Saving converted data...')
-        filename = args.o + '_'.join(prefix + ['rf_data']) + '.pickle'
-        output((X, Y, Tf_list), filename)
-        print('File saved!')
+    # if args.z:
+    #     print('\n' + '-' * 60 + '\n')
+    #     Y = psi_z_score(Y)
+    #     prefix.append('zscore')
+    #     print('Saving converted data...')
+    #     filename = args.o + '_'.join(prefix + ['rf_data']) + '.pickle'
+    #     output((X, Y, Tf_list), filename)
+    #     print('File saved!')
 
-    if args.d:
-        print('\n' + '-' * 60 + '\n')
-        X, Y = delta_data_converter(X, Y, Tf_list)
-        print('Saving converted delta data...')
-        filename = args.o + '_'.join(prefix + ['delta_data']) + '.pickle'
-        output((X, Y, Tf_list), filename)
-        print('File saved!')
+    # if args.d:
+    #     print('\n' + '-' * 60 + '\n')
+    #     X, Y = delta_data_converter(X, Y, Tf_list)
+    #     print('Saving converted delta data...')
+    #     filename = args.o + '_'.join(prefix + ['delta_data']) + '.pickle'
+    #     output((X, Y, Tf_list), filename)
+    #     print('File saved!')
 
 
 if __name__ == '__main__':

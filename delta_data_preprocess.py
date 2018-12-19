@@ -3,7 +3,8 @@ import argparse
 import pickle
 from os.path import basename
 
-from utils import delta_data_converter, output
+from scipy.sparse import issparse
+from utils import QuantDeltaConverter, QuantDeltaConverter_sparse, output
 
 
 def parse_options():
@@ -30,7 +31,10 @@ def main():
     with open(args.i, mode='rb') as fh:
         X, Y, Tf_list = pickle.load(fh)
 
-    X, Y = delta_data_converter(X, Y, Tf_list)
+    if issparse(X):
+        X, Y = QuantDeltaConverter_sparse(X, Y, Tf_list).output()
+    else:
+        X, Y = QuantDeltaConverter(X, Y, Tf_list).output()
 
     filename = basename(args.i)
     prefix = filename[:-14]
