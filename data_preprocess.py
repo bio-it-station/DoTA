@@ -6,9 +6,9 @@ from collections import defaultdict
 import numpy as np
 import pandas as pd
 from scipy.sparse import coo_matrix
+from tqdm import tqdm
 
-from utils import (output, psi_z_score,
-                   update_progress_bar)
+from utils import output, psi_z_score
 
 
 def parse_options():
@@ -62,15 +62,16 @@ def cart_data_converter(features, y, tf_list, tf_weight=None):
     num_tf = len(tf_list)
     x = np.zeros((num_data, num_tf), dtype='bool')
 
+    pbar = tqdm(total=num_data)
     for i, [gene, _, tissue] in enumerate(y.values):
         for j, tf in enumerate(tf_list):
             full_id = tissue + gene + tf
             if full_id in features:
                 x[i][j] = tf_weight.at[tissue, tf]
         i += 1
-        if i == num_data or i % 1000 == 0:
-            update_progress_bar(i / num_data * 100,
-                                '{}/{}'.format(i, num_data))
+        if i % 1000 == 0:
+            pbar.update(1000)
+    pbar.close()
 
     return x
 
@@ -88,6 +89,7 @@ def nn_data_converter(features, y, tf_list, tf_weight=None):
     row = []
     col = []
 
+    pbar = tqdm(total=num_data)
     for i, [gene, _, tissue] in enumerate(y.values):
         for j, tf in enumerate(tf_list):
             if not tf_weight.at[tissue, tf]:
@@ -99,14 +101,14 @@ def nn_data_converter(features, y, tf_list, tf_weight=None):
                     col += pos
                     row += [i * num_tf + j] * len(pos)
         i += 1
-        if i == num_data or i % 1000 == 0:
-            update_progress_bar(i / num_data * 100,
-                                '{}/{}'.format(i, num_data))
+        if i % 1000 == 0:
+            pbar.update(1000)
 
     data = [True] * len(row)
     x = coo_matrix((data, (row, col)), shape=(
         num_data * num_tf, 2500), dtype='bool')
     x = x.tocsr()
+    pbar.close()
 
     return x
 

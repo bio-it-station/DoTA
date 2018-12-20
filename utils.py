@@ -11,6 +11,7 @@ import pandas as pd
 from scipy.sparse import issparse
 from scipy.special import comb
 from sklearn.preprocessing import MinMaxScaler
+from tqdm import tqdm
 
 
 def _getThreads():
@@ -22,8 +23,7 @@ def _getThreads():
 
 def delete_emtpy_tf(x, tf_list):
     if issparse(x):
-        tf_sum = np.asarray(x.sum(axis=1).reshape(
-            x.shape[0] // len(tf_list), len(tf_list)).sum(axis=0))
+        tf_sum = np.asarray(x.sum(axis=1).reshape(x.shape[0] // len(tf_list), len(tf_list)).sum(axis=0))
         del_tf = np.where(tf_sum.reshape(-1) == 0)[0]
         arr = np.arange(0, x.shape[0], len(tf_list))
         new_arr = np.empty((del_tf.shape[0], arr.shape[0]), dtype=np.int)
@@ -102,8 +102,7 @@ def psi_z_score(y: pd.DataFrame) -> Tuple[np.ndarray, pd.DataFrame]:
     psi_sd = psi_sd.to_dict()
 
     # calculate z-score
-    z_score = [(psi - psi_mean[gene]) / psi_sd[gene]
-               for gene, psi in zip(y['Gene'], y['PSI'])]
+    z_score = [(psi - psi_mean[gene]) / psi_sd[gene] for gene, psi in zip(y['Gene'], y['PSI'])]
     y = y.assign(PSI=z_score)
     print('DONE!')
 
@@ -124,23 +123,18 @@ def quantile_convert(x, y, tf_list):
     data_scaled[idx] = np.nan
     # set 20% ~ 80% to NaN
     data_scaled[(data_scaled > 0.2) & (data_scaled < 0.8)] = np.nan
-    psi_scaled = pd.DataFrame(
-        data_scaled, columns=psi_df.columns, index=psi_df.index)
+    psi_scaled = pd.DataFrame(data_scaled, columns=psi_df.columns, index=psi_df.index)
     # Z-score
     psi_mean = psi_df.mean(axis=1)
     psi_stdev = psi_df.std(axis=1)
-    zpsi_df = psi_df.apply(lambda x: (
-        x - psi_mean[x.name]) / psi_stdev[x.name], axis=1)
+    zpsi_df = psi_df.apply(lambda x: (x - psi_mean[x.name]) / psi_stdev[x.name], axis=1)
     # save original idx
     idx_df = y.reset_index().pivot(index='Gene', columns='Tissue')['index']
     orig_idx = idx_df.reset_index(drop=True).T.melt()['value']
     # collect all information
-    psi_data = zpsi_df.reset_index(drop=True).T.melt(
-        var_name='sample', value_name='zpsi')
-    psi_data['psi'] = psi_df.reset_index(
-        drop=True).T.melt(var_name='sample')['value']
-    psi_data['psi_scaled'] = psi_scaled.reset_index(
-        drop=True).T.melt(var_name='sample')['value']
+    psi_data = zpsi_df.reset_index(drop=True).T.melt(var_name='sample', value_name='zpsi')
+    psi_data['psi'] = psi_df.reset_index(drop=True).T.melt(var_name='sample')['value']
+    psi_data['psi_scaled'] = psi_scaled.reset_index(drop=True).T.melt(var_name='sample')['value']
     psi_data['idx'] = orig_idx
     psi_data.dropna(inplace=True)
     psi_data['idx'] = psi_data['idx'].astype(int)
@@ -183,22 +177,15 @@ class _DeltaConverter(ABC):
         print('Performing delta data convention...\n')
 
         # Create an nan array with estimated event numbers as new features array
-        esti_events_num = 0
+        events_count = 0
         for num in self.genes['Tissue']:
-            esti_events_num += comb(num, 2)
-        esti_events_num = int(esti_events_num)
-        print('estimated event numbers:', esti_events_num)
+            events_count += comb(num, 2)
+        self.esti_events_num = int(events_count)
+        print('estimated event numbers:', self.esti_events_num)
 
-        self.new_x = np.zeros((esti_events_num, len(self.tf_list)))
-        self.new_x[:] = np.nan
-
-        self.converter()
-        self.new_x = self.new_x[~np.isnan(
-            self.new_x).any(axis=1)].astype('bool')
-        self.new_y['Gene'] = self.new_y['Gene'].astype('category')
-
+    @abstractmethod
     def output(self):
-        return self.new_x, self.new_y
+        pass
 
     @abstractmethod
     def converter(self):
@@ -213,16 +200,15 @@ class QuantDeltaConverter(_DeltaConverter):
         new_y_dpsi = []
         new_y_gene = []
         new_psi_group = []
+        self.new_x = np.zeros((self.esti_events_num, len(self.tf_list)))
+        self.new_x[:] = np.nan
         for gene in self.genes.index:
             event_ind_list = self.y[self.y['Gene'] == gene].index
             for event_1, event_2 in combinations(event_ind_list, 2):
-                # delta_psi = abs(y.at[event_1, 'PSI'] - y.at[event_2, 'PSI'])
-                delta_psi = abs(
-                    self.y.at[event_1, 'ZPSI'] - self.y.at[event_2, 'ZPSI'])
+                delta_psi = abs(self.y.at[event_1, 'ZPSI'] - self.y.at[event_2, 'ZPSI'])
                 if delta_psi:
                     delta_feature = self.x[event_1] ^ self.x[event_2]
-                    delta_psi_group = self.y.at[event_1,
-                                                'psi_group'] ^ self.y.at[event_2, 'psi_group']
+                    delta_psi_group = self.y.at[event_1, 'psi_group'] ^ self.y.at[event_2, 'psi_group']
                 else:
                     continue
                 self.new_x[i] = delta_feature
@@ -230,44 +216,50 @@ class QuantDeltaConverter(_DeltaConverter):
                 new_psi_group.append(delta_psi_group)
                 new_y_gene.append(gene)
                 i += 1
-        self.new_y = pd.DataFrame(
-            data={'Gene': new_y_gene, 'PSI': new_y_dpsi, 'psi_group': new_psi_group})
+        self.new_y = pd.DataFrame(data={'Gene': new_y_gene, 'PSI': new_y_dpsi, 'psi_group': new_psi_group})
         self.new_y['psi_group'] = self.new_y['psi_group'].astype('category')
 
+    def output(self):
+        self.converter()
+        self.new_x = self.new_x[~np.isnan(self.new_x).any(axis=1)].astype('bool')
+        self.new_y['Gene'] = self.new_y['Gene'].astype('category')
+        return self.new_x, self.new_y
 
-class QuantDeltaConverter_sparse(_DeltaConverter):
+
+class QuantDeltaConverterSparse(_DeltaConverter):
     """Apply Quantile categorize 20% with sparse matrix"""
 
     def converter(self):
-        if issparse(self.x):
-            pass
-        else:
-            print('Error: X_data is not sparse matrix')
-            return
+        if not issparse(self.x):
+            raise ValueError('X_data is not sparse matrix')
         i = 0
+        n_tf = len(self.tf_list)
         new_y_dpsi = []
         new_y_gene = []
         new_psi_group = []
-        for gene in self.genes.index:
+        for gene in tqdm(self.genes.index):
             event_ind_list = self.y[self.y['Gene'] == gene].index
             for event_1, event_2 in combinations(event_ind_list, 2):
-                # delta_psi = abs(y.at[event_1, 'PSI'] - y.at[event_2, 'PSI'])
-                delta_psi = abs(
-                    self.y.at[event_1, 'ZPSI'] - self.y.at[event_2, 'ZPSI'])
+                delta_psi = abs(self.y.at[event_1, 'ZPSI'] - self.y.at[event_2, 'ZPSI'])
                 if delta_psi:
-                    delta_feature = self.x[event_1] - self.x[event_2]
-                    delta_psi_group = self.y.at[event_1,
-                                                'psi_group'] ^ self.y.at[event_2, 'psi_group']
+                    x_1 = self.x[event_1 * n_tf:(event_1 + 1) * n_tf]
+                    x_2 = self.x[event_2 * n_tf:(event_2 + 1) * n_tf]
+                    delta_feature = x_1 - x_2
+                    delta_psi_group = self.y.at[event_1, 'psi_group'] ^ self.y.at[event_2, 'psi_group']
                 else:
                     continue
-                self.new_x[i] = delta_feature
+                self.new_x.append(delta_feature)
                 new_y_dpsi.append(delta_psi)
                 new_psi_group.append(delta_psi_group)
                 new_y_gene.append(gene)
                 i += 1
-        self.new_y = pd.DataFrame(
-            data={'Gene': new_y_gene, 'PSI': new_y_dpsi, 'psi_group': new_psi_group})
+        self.new_y = pd.DataFrame(data={'Gene': new_y_gene, 'PSI': new_y_dpsi, 'psi_group': new_psi_group})
         self.new_y['psi_group'] = self.new_y['psi_group'].astype('category')
+
+    def output(self):
+        self.converter()
+        self.new_y['Gene'] = self.new_y['Gene'].astype('category')
+        return self.new_x, self.new_y
 
 
 class DeltaConverter(_DeltaConverter):
@@ -277,12 +269,12 @@ class DeltaConverter(_DeltaConverter):
         i = 0
         new_y_dpsi = []
         new_y_gene = []
+        self.new_x = np.zeros((self.esti_events_num, len(self.tf_list)))
+        self.new_x[:] = np.nan
         for gene in self.genes.index:
             event_ind_list = self.y[self.y['Gene'] == gene].index
             for event_1, event_2 in combinations(event_ind_list, 2):
-                # delta_psi = abs(y.at[event_1, 'PSI'] - y.at[event_2, 'PSI'])
-                delta_psi = abs(
-                    self.y.at[event_1, 'ZPSI'] - self.y.at[event_2, 'ZPSI'])
+                delta_psi = abs(self.y.at[event_1, 'ZPSI'] - self.y.at[event_2, 'ZPSI'])
                 if delta_psi:
                     delta_feature = self.x[event_1] ^ self.x[event_2]
                 else:
@@ -293,9 +285,15 @@ class DeltaConverter(_DeltaConverter):
                 i += 1
         self.new_y = pd.DataFrame(data={'Gene': new_y_gene, 'PSI': new_y_dpsi})
         self.new_y['psi_group'] = self.new_y['psi_group'].astype('category')
+    
+    def output(self):
+        self.converter()
+        self.new_x = self.new_x[~np.isnan(self.new_x).any(axis=1)].astype('bool')
+        self.new_y['Gene'] = self.new_y['Gene'].astype('category')
+        return self.new_x, self.new_y
 
 
-class nn_X_generator(object):
+class nn_X_generator:
     def __init__(self, x, tf_list):
         self.x = x
         self.len = len(tf_list)
@@ -303,17 +301,6 @@ class nn_X_generator(object):
     def __getitem__(self, n):
         data = self.x[n * self.len: (n + 1) * self.len]
         return data
-
-
-def update_progress_bar(perc: float, option_info: str = None) -> None:
-    """
-    update progress bar
-    :param perc: ratio of current run and whole cycle in percentage
-    :option_info: alternative output format
-    """
-    sys.stdout.write('[{:60}] {:.2f}%, {}\r'.format(
-        '=' * int(60 * perc // 100), perc, option_info))
-    sys.stdout.flush()
 
 
 def output(var: tuple, filename: str) -> None:
