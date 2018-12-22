@@ -1,4 +1,4 @@
-# ignore anything
+# ignore everything
 *
 
 # markdown, python, R
@@ -15,4 +15,5 @@
 
 # editor
 .vscode/
+.Trash-1000/
 .ipynb_checkpoints
