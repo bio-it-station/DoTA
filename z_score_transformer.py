@@ -4,7 +4,11 @@ import pickle
 from os.path import basename
 
 from scipy.sparse import issparse
-from utils import QuantDeltaConverter, QuantDeltaConverter_sparse, output, psi_z_score
+
+from utils import (DeltaConverter, QuantDeltaConverter,
+                   QuantDeltaConverterSparse, delete_emtpy_tf,
+                   filter_less_than_3, filter_low_psi_range, output,
+                   psi_z_score, quantile_convert)
 
 
 def parse_options():
@@ -22,7 +26,38 @@ def parse_options():
     input_output.add_argument('--o', metavar='<output-dir>', default='./input/',
                               help='Output file directory (default=\'./input/\')')
 
+    param = parser.add_argument_group('Parameters')
+    param = param.add_mutually_exclusive_group(required=True)
+    param.add_argument('-z', action='store_true', help='<Optional switch> Normal z-score transformation')
+    param.add_argument('-q', action='store_true', help='<Optional switch> Quantile convertion')
+
     return parser.parse_args()
+
+
+def z_transform(x, y, tf_list):
+    x, y = filter_less_than_3(x, y, tf_list)
+    x, y = filter_low_psi_range(x, y, tf_list)
+    x, tf_list = delete_emtpy_tf(x, tf_list)
+
+    y = psi_z_score(y)
+    x, y = DeltaConverter(x, y, tf_list).output()
+    return x, y, tf_list
+
+
+def quantile(x, y, tf_list):
+    x, y = filter_less_than_3(x, y, tf_list)
+    x, y = filter_low_psi_range(x, y, tf_list)
+    x, tf_list = delete_emtpy_tf(x, tf_list)
+
+    x, y = quantile_convert(x, y, tf_list)
+    x, y = filter_less_than_3(x, y, tf_list)
+
+    if issparse(x):
+        x, y = QuantDeltaConverterSparse(x, y, tf_list).output()
+    else:
+        x, y = QuantDeltaConverter(x, y, tf_list).output()
+
+    return x, y, tf_list
 
 
 def main():
@@ -31,17 +66,19 @@ def main():
     with open(args.i, mode='rb') as fh:
         X, Y, Tf_list = pickle.load(fh)
 
-    Y = psi_z_score(Y)
-    if issparse(X):
-        X, Y = QuantDeltaConverter_sparse(X, Y, Tf_list).output()
-    else:
-        X, Y = QuantDeltaConverter(X, Y, Tf_list).output()
+    if args.z:
+        X, Y, Tf_list = z_transform(X, Y, Tf_list)
+    if args.q:
+        X, Y, Tf_list = quantile(X, Y, Tf_list)
 
     filename = basename(args.i)
-    prefix = filename[:-14] + 'zscore_'
-    datatype = 'delta_data'
+    filename = filename.split('_')
+    prefix = filename[:-2]
+    datatype = filename[-2:-1]
+    prefix.append('zscore')
+    datatype.append('delta')
     print('Saving converted delta data...')
-    filename = args.o + prefix + datatype + '.pickle'
+    filename = args.o + '_'.join(prefix + datatype + ['data.pickle'])
     output((X, Y, Tf_list), filename)
     print('File saved!')
 
