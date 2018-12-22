@@ -8,7 +8,8 @@ import pandas as pd
 from scipy.sparse import coo_matrix
 from tqdm import tqdm
 
-from utils import output, psi_z_score
+from utils import output
+from z_score_transformer import z_transform, quantile
 
 
 def parse_options():
@@ -35,9 +36,10 @@ def parse_options():
     input_output.add_argument('--o', metavar='<output-dir>', default='./input/',
                               help='Output file directory (default=\'./input/\')')
 
-    # param = parser.add_argument_group('Parameters')
-    # param.add_argument('-z', action='store_true', help='<Optional switch> Output z-score of PSI')
-    # param.add_argument('-d', action='store_true', help='<Optional switch> Convert delta_data')
+    param = parser.add_argument_group('Parameters')
+    param = param.add_mutually_exclusive_group(required=False)
+    param.add_argument('-z', action='store_true', help='<Optional switch> Normal z-score transformation')
+    param.add_argument('-q', action='store_true', help='<Optional switch> Quantile convertion')
 
     file_format = parser.add_argument_group('Data format')
     file_format = file_format.add_mutually_exclusive_group(required=True)
@@ -157,8 +159,7 @@ def main():
                     col = line.rstrip().split()
                     Gene_list.add(col[0])
                     Tf_list.add(col[3])
-                    features_data[tissue_name + col[0] + col[3]
-                                  ].append((int(col[1]), int(col[2])))
+                    features_data[tissue_name + col[0] + col[3]].append((int(col[1]), int(col[2])))
             print('DONE!')
 
     Tf_list = sorted(Tf_list)
@@ -179,39 +180,43 @@ def main():
         Tf_weight = Tf_weight.loc[:, (Tf_weight != 0).any(axis=0)]
         prefix.append('weight')
     else:
-        Tf_weight = pd.DataFrame(
-            True, index=targets_tissue_list, columns=Tf_list)
+        Tf_weight = pd.DataFrame(True, index=targets_tissue_list, columns=Tf_list)
 
     # Convert data for NN or CART
     print('\n' + '-' * 60 + '\n')
     print('Converting data...')
+    datatype = []
     if args.C:
         X = cart_data_converter(features_data, Y, Tf_list, Tf_weight)
-        filename = args.o + '_'.join(prefix + ['rf_data']) + '.pickle'
+        datatype.append('rf')
     else:
         X = nn_data_converter(features_data, Y, Tf_list, Tf_weight)
-        filename = args.o + '_'.join(prefix + ['nn']) + '.pickle'
+        datatype.append('nn')
+    filename = args.o + '_'.join(prefix + datatype + ['data.pickle'])
     print('\nDONE!')
     print('Saving converted data...')
     output((X, Y, Tf_list), filename)
     print('File saved!')
 
-    # if args.z:
-    #     print('\n' + '-' * 60 + '\n')
-    #     Y = psi_z_score(Y)
-    #     prefix.append('zscore')
-    #     print('Saving converted data...')
-    #     filename = args.o + '_'.join(prefix + ['rf_data']) + '.pickle'
-    #     output((X, Y, Tf_list), filename)
-    #     print('File saved!')
+    if args.z:
+        print('\n' + '-' * 60 + '\n')
+        X, Y, Tf_list = z_transform(X, Y, Tf_list)
+        prefix.append('zscore')
+        datatype.append('delta')
+        print('Saving converted data...', end='')
+        filename = args.o + '_'.join(prefix + datatype + ['data.pickle'])
+        output((X, Y, Tf_list), filename)
+        print('File saved!')
 
-    # if args.d:
-    #     print('\n' + '-' * 60 + '\n')
-    #     X, Y = delta_data_converter(X, Y, Tf_list)
-    #     print('Saving converted delta data...')
-    #     filename = args.o + '_'.join(prefix + ['delta_data']) + '.pickle'
-    #     output((X, Y, Tf_list), filename)
-    #     print('File saved!')
+    if args.q:
+        print('\n' + '-' * 60 + '\n')
+        X, Y, Tf_list = quantile(X, Y, Tf_list)
+        prefix.append('quantile')
+        datatype.append('delta')
+        print('Saving converted data...', end='')
+        filename = args.o + '_'.join(prefix + datatype + ['data.pickle'])
+        output((X, Y, Tf_list), filename)
+        print('File saved!')
 
 
 if __name__ == '__main__':

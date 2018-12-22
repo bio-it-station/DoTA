@@ -8,7 +8,7 @@ from typing import Tuple
 
 import numpy as np
 import pandas as pd
-from scipy.sparse import issparse
+from scipy.sparse import issparse, vstack
 from scipy.special import comb
 from sklearn.preprocessing import MinMaxScaler
 from tqdm import tqdm
@@ -22,6 +22,8 @@ def _getThreads():
 
 
 def delete_emtpy_tf(x, tf_list):
+    print('Removing tf columns with no binding in whole dataset...', end='')
+
     if issparse(x):
         tf_sum = np.asarray(x.sum(axis=1).reshape(x.shape[0] // len(tf_list), len(tf_list)).sum(axis=0))
         del_tf = np.where(tf_sum.reshape(-1) == 0)[0]
@@ -37,27 +39,32 @@ def delete_emtpy_tf(x, tf_list):
         del_tf = np.where(x.sum(axis=0) == 0)[0]
         x = np.delete(x, del_tf, 1)
     tf_list = np.delete(np.asarray(tf_list), del_tf).tolist()
+    print('DONE!')
+
     return x, tf_list
 
 
-def filter_by_gene(x, y, gene_list):
+def filter_by_gene(x, y, gene_list, tf_list):
+    n_tf = len(tf_list)
     filtered_idx = y[y['Gene'].isin(gene_list)].index
     if issparse(x):
         mask = np.zeros(x.shape[0], dtype='bool')
         for idx in filtered_idx:
-            mask[idx * 359: (idx + 1) * 359] = True
+            mask[idx * n_tf: (idx + 1) * n_tf] = True
         x = x[mask]
     else:
         x = x[filtered_idx]
-    y = y[filtered_idx].reset_index(drop=True)
+    y = y.loc[filtered_idx].reset_index(drop=True)
     return x, y
 
 
-def filter_less_than_3(x, y):
+def filter_less_than_3(x, y, tf_list):
     """ remove genes with less than 3 tissue """
+    print('Removing genes with less than 3 tissue-events...', end='')
+
     gene_count = y.groupby('Gene')['PSI'].count()
     gene_list = gene_count[gene_count > 2].index
-    x, y = filter_by_gene(x, y, gene_list)
+    x, y = filter_by_gene(x, y, gene_list, tf_list)
 
     # Create psi table
     psi_df = y.pivot(index='Gene', columns='Tissue')['PSI']
@@ -67,18 +74,24 @@ def filter_less_than_3(x, y):
 
     # Drop genes with no stdev across different tissues
     keep_gene = psi_stdev[psi_stdev != 0].index
-    x, y = filter_by_gene(x, y, keep_gene)
+    x, y = filter_by_gene(x, y, keep_gene, tf_list)
+    print('DONE!')
+
     return x, y
 
 
-def filter_low_psi_range(x, y):
-    """ remove genes with less than 3 tissue """
+def filter_low_psi_range(x, y, tf_list):
+    """ remove genes with low psi range """
+    print('Removing genes with low psi range...', end='')
+
     # Create psi table
     psi_df = y.pivot(index='Gene', columns='Tissue')['PSI']
     # Cut-off genes with psi range < 0.2
     psi_range = psi_df.max(axis=1) - psi_df.min(axis=1)
     gene_remained_list = psi_range[psi_range >= 0.2]
-    x, y = filter_by_gene(x, y, gene_remained_list.index)
+    x, y = filter_by_gene(x, y, gene_remained_list.index, tf_list)
+    print('DONE!')
+
     return x, y
 
 
@@ -89,7 +102,6 @@ def psi_z_score(y: pd.DataFrame) -> Tuple[np.ndarray, pd.DataFrame]:
     :param Y: Raw PSI value
     :return result: tuple of converted (X, Y)
     """
-    print('Performing Z-score transformation...\n')
     print('Converting PSI to z-score...', end='')
 
     # calculate mean
@@ -103,13 +115,15 @@ def psi_z_score(y: pd.DataFrame) -> Tuple[np.ndarray, pd.DataFrame]:
 
     # calculate z-score
     z_score = [(psi - psi_mean[gene]) / psi_sd[gene] for gene, psi in zip(y['Gene'], y['PSI'])]
-    y = y.assign(PSI=z_score)
+    y['ZPSI'] = z_score
     print('DONE!')
 
     return y
 
 
 def quantile_convert(x, y, tf_list):
+    print('Applying quantile and Z-score convertion...', end='')
+
     # Create psi table
     psi_df = y.pivot(index='Gene', columns='Tissue')['PSI']
     # Do data scaling (linear scaling to [0,1])
@@ -153,6 +167,8 @@ def quantile_convert(x, y, tf_list):
     y = y.iloc[psi_data['idx'].astype(int)].reset_index(drop=True)
     y['ZPSI'] = psi_data.reset_index()['zpsi']
     y['psi_group'] = psi_data.reset_index()['psi_group']
+    print('DONE!')
+
     return x, y
 
 
@@ -220,9 +236,11 @@ class QuantDeltaConverter(_DeltaConverter):
         self.new_y['psi_group'] = self.new_y['psi_group'].astype('category')
 
     def output(self):
+        print('Applying delta data converter...', end='')
         self.converter()
         self.new_x = self.new_x[~np.isnan(self.new_x).any(axis=1)].astype('bool')
         self.new_y['Gene'] = self.new_y['Gene'].astype('category')
+        print('DONE!')
         return self.new_x, self.new_y
 
 
@@ -237,6 +255,7 @@ class QuantDeltaConverterSparse(_DeltaConverter):
         new_y_dpsi = []
         new_y_gene = []
         new_psi_group = []
+        self.new_x = []
         for gene in tqdm(self.genes.index):
             event_ind_list = self.y[self.y['Gene'] == gene].index
             for event_1, event_2 in combinations(event_ind_list, 2):
@@ -257,8 +276,11 @@ class QuantDeltaConverterSparse(_DeltaConverter):
         self.new_y['psi_group'] = self.new_y['psi_group'].astype('category')
 
     def output(self):
+        print('Applying delta data converter...', end='')
         self.converter()
+        self.new_x = vstack(self.new_x, format='csr', dtype=np.bool)
         self.new_y['Gene'] = self.new_y['Gene'].astype('category')
+        print('DONE!')
         return self.new_x, self.new_y
 
 
@@ -284,12 +306,13 @@ class DeltaConverter(_DeltaConverter):
                 new_y_gene.append(gene)
                 i += 1
         self.new_y = pd.DataFrame(data={'Gene': new_y_gene, 'PSI': new_y_dpsi})
-        self.new_y['psi_group'] = self.new_y['psi_group'].astype('category')
-    
+
     def output(self):
+        print('Applying delta data converter...', end='')
         self.converter()
         self.new_x = self.new_x[~np.isnan(self.new_x).any(axis=1)].astype('bool')
         self.new_y['Gene'] = self.new_y['Gene'].astype('category')
+        print('DONE!')
         return self.new_x, self.new_y
 
 
