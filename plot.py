@@ -1,3 +1,4 @@
+import itertools
 import pickle
 
 import matplotlib
@@ -17,13 +18,14 @@ def delta_data_boxplot(file_in: str, file_out: str) -> None:
     with open(file_in, mode='rb') as fh:
         x, y, _ = pickle.load(fh)
         y = y['PSI']
-    df = pd.DataFrame(np.sum(x, axis=1, dtype=np.int32), columns=['delta_feature_sum'])
+    df = pd.DataFrame(np.sum(x, axis=1, dtype=np.int32),
+                      columns=['delta_feature_sum'])
     df['delta_psi'] = y
 
     df = df[df['delta_feature_sum'] < 50]
     fig = plt.figure(figsize=(12.0, 4.0))
-    fig = sns.boxplot(x='delta_feature_sum', y='delta_psi', data=df)
-    fig.tight_layout()
+    sns.boxplot(x='delta_feature_sum', y='delta_psi', data=df)
+    plt.tight_layout()
     fig.savefig(file_out, dpi=300)
     plt.clf()
     plt.close()
@@ -44,3 +46,38 @@ def plot_cdf(data, file_out: str) -> None:
     plt.clf()
     plt.close()
     plt.gcf().clear()
+
+
+def plot_confusion_matrix(cm, classes,
+                          normalize=False,
+                          title='Confusion matrix',
+                          cmap=plt.cm.Blues):
+    """
+    This function prints and plots the confusion matrix.
+    Normalization can be applied by setting `normalize=True`.
+    """
+    if normalize:
+        cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+        print("Normalized confusion matrix")
+    else:
+        print('Confusion matrix, without normalization')
+
+    print(cm)
+
+    plt.imshow(cm, interpolation='nearest', cmap=cmap)
+    plt.title(title)
+    plt.colorbar()
+    tick_marks = np.arange(len(classes))
+    plt.xticks(tick_marks, classes, rotation=45)
+    plt.yticks(tick_marks, classes)
+
+    fmt = '.2f' if normalize else 'd'
+    thresh = cm.max() / 2.
+    for i, j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
+        plt.text(j, i, format(cm[i, j], fmt),
+                 horizontalalignment="center",
+                 color="white" if cm[i, j] > thresh else "black")
+
+    plt.tight_layout()
+    plt.ylabel('True label')
+    plt.xlabel('Predicted label')
