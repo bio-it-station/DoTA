@@ -316,16 +316,6 @@ class DeltaConverter(_DeltaConverter):
         return self.new_x, self.new_y
 
 
-class nn_X_generator:
-    def __init__(self, x, tf_list):
-        self.x = x
-        self.len = len(tf_list)
-
-    def __getitem__(self, n):
-        data = self.x[n * self.len: (n + 1) * self.len]
-        return data
-
-
 def output(var: tuple, filename: str) -> None:
     """
     Save required information into a file
