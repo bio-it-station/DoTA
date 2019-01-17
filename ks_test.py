@@ -68,7 +68,7 @@ def main():
 
     print('Progressing Ks-test and CDF plots...')
 
-    if args.p > 1:
+    if args.p != 1:
         # create memmap file in tmpfs
         DEFAULT_TMP_FILE = '/dev/shm'
         # try to use temp folder on tmpfs (/dev/shm)
@@ -100,10 +100,11 @@ def main():
     print('\nks-test complete!')
 
     # cleanup
-    try:
-        shutil.rmtree(pool_tmp)
-    except (IOError, OSError):
-        print('failed to clean-up mmep automatically', file=sys.stderr)
+    if args.p != 1:
+        try:
+            shutil.rmtree(pool_tmp)
+        except (IOError, OSError):
+            print('failed to clean-up mmep automatically', file=sys.stderr)
 
     # Convert to pd.dataframe and do pval correction
     df = pd.DataFrame.from_dict(ks_result, orient='index')
