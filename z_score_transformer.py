@@ -66,16 +66,18 @@ def main():
     with open(args.i, mode='rb') as fh:
         X, Y, Tf_list = pickle.load(fh)
 
-    if args.z:
-        X, Y, Tf_list = z_transform(X, Y, Tf_list)
-    if args.q:
-        X, Y, Tf_list = quantile(X, Y, Tf_list)
-
     filename = basename(args.i)
     filename = filename.split('_')
     prefix = filename[:-2]
     datatype = filename[-2:-1]
-    prefix.append('zscore')
+
+    if args.z:
+        X, Y, Tf_list = z_transform(X, Y, Tf_list)
+        prefix.append('zscore')
+    if args.q:
+        X, Y, Tf_list = quantile(X, Y, Tf_list)
+        prefix.append('quantile')
+
     datatype.append('delta')
     print('Saving converted delta data...')
     filename = args.o + '_'.join(prefix + datatype + ['data.pickle'])

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import os
+import sys
 from collections import defaultdict
 
 import numpy as np
@@ -15,12 +16,11 @@ from z_score_transformer import z_transform, quantile
 def parse_options():
     """
     Argument parser
-    :param argv: arguments from sys.argv
     :return: arguments
     """
     parser = argparse.ArgumentParser(
         prog=__file__,
-        usage='%(prog)s ([Input/Output]...) [Data format]...',
+        usage='%(prog)s ([Input/Output]... ) ([Parameters]...) [Data format]...',
         description="""Generate the feature and target data for machine-learning framework.
         The feature data converted from tf-promoter-peaks, and the target data from MISO-reported
         psi of first splicing event of each genes. The data will be converted by numpy and scipy
@@ -198,25 +198,24 @@ def main():
     output((X, Y, Tf_list), filename)
     print('File saved!')
 
+    if not (args.z or args.q):
+        sys.exit()
+
+    print('\n' + '-' * 60 + '\n')
     if args.z:
-        print('\n' + '-' * 60 + '\n')
         X, Y, Tf_list = z_transform(X, Y, Tf_list)
         prefix.append('zscore')
-        datatype.append('delta')
-        print('Saving converted data...', end='')
-        filename = args.o + '_'.join(prefix + datatype + ['data.pickle'])
-        output((X, Y, Tf_list), filename)
-        print('File saved!')
 
-    if args.q:
+    else:
         print('\n' + '-' * 60 + '\n')
         X, Y, Tf_list = quantile(X, Y, Tf_list)
         prefix.append('quantile')
-        datatype.append('delta')
-        print('Saving converted data...', end='')
-        filename = args.o + '_'.join(prefix + datatype + ['data.pickle'])
-        output((X, Y, Tf_list), filename)
-        print('File saved!')
+
+    datatype.append('delta')
+    print('Saving converted data...', end='')
+    filename = args.o + '_'.join(prefix + datatype + ['data.pickle'])
+    output((X, Y, Tf_list), filename)
+    print('File saved!')
 
 
 if __name__ == '__main__':
