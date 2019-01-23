@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 import argparse
+import os
 import pickle
+
+from plot import plot_confusion_matrix
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -11,7 +14,6 @@ from torch import nn, optim
 from torch.utils.data import DataLoader, Dataset, Sampler, random_split
 from tqdm import tqdm
 
-from plot import plot_confusion_matrix
 from utils import _getThreads
 
 
@@ -40,6 +42,7 @@ def parse_options():
                        help='Which gpu device to use (range: 0~{}, default=0)'.format(gpu_device - 1))
     param.add_argument('-b', '--batch', default=128, type=int)
     param.add_argument('-e', '--epoch', default=10, type=int)
+    param.add_argument('--checkpoint', help='Prefix of checkoutput output folder')
 
     model = parser.add_argument_group('Save/Load model')
     model = model.add_mutually_exclusive_group(required=False)
@@ -143,8 +146,10 @@ def main():
     n_tf = len(tf_list)
     full_dataset = DotaDataset(n_tf, x, y)
     torch.manual_seed(9487)
-    train_dataset, val_dataset, test_dataset = random_split(full_dataset, [round(len(
-        full_dataset) * 0.7), round(len(full_dataset) * 0.1), round(len(full_dataset) * 0.2)])
+    train_dataset, val_dataset, test_dataset = random_split(full_dataset,
+                                                            [round(len(full_dataset) * 0.7),
+                                                             round(len(full_dataset) * 0.1),
+                                                             round(len(full_dataset) * 0.2)])
     print('DONE!')
 
     print('Balancing data...')
@@ -160,6 +165,8 @@ def main():
     cuda = torch.device(f'cuda:{args.gpu}')
 
     if not args.L:
+        if args.checkpoint and not os.path.exists(args.checkpoint):
+            os.makedirs(args.checkpoint)
         net = DotaNet(n_tf=n_tf).to(cuda)
         criterion = nn.BCEWithLogitsLoss()
         optimizer = optim.Adam(net.parameters())
@@ -205,19 +212,28 @@ def main():
                 print(
                     f'Accuracy on val dataset after {epoch + 1} epoch: {100 * correct / total:.3f}%')
 
+            if args.checkpoint:
+                filename = f'{args.checkpoint}/checkpoint_{epoch + 1}.pt'
+                torch.save({'epoch': epoch,
+                            'model_state_dict': net.state_dict(),
+                            'optimizer_state_dict': optimizer.state_dict(),
+                            'loss': loss}, filename)
+
         print('Finished Training')
         if args.S:
             filename = args.S + '.pt'
-            torch.save(net, filename)
+            torch.save(net.state_dict(), filename)
 
     else:
-        net = torch.load(args.L)
+        net = DotaNet(n_tf=n_tf)
+        net.load_state_dict(torch.load(args.L, map_location=cuda))
+        net.to(cuda)
 
     with torch.no_grad():
         correct = 0
         total = 0
-        y_true = torch.empty(0, 0)
-        y_pred = torch.empty(0, 0)
+        y_true = torch.empty(0, 1)
+        y_pred = torch.empty(0, 1)
         net.eval()
         for data in test_loader:
             inputs, labels = data
