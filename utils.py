@@ -175,7 +175,7 @@ def quantile_convert(x, y, tf_list):
 class _DeltaConverter(ABC):
     """Basal Class of Delta data converter"""
 
-    def __init__(self, x: np.ndarray, y: pd.DataFrame, tf_list: list) -> Tuple[np.ndarray, pd.DataFrame]:
+    def __init__(self, x: np.ndarray, y: pd.DataFrame, tf_list: list):
         """
         :param x: feature data for CART model
         :param y: target data for ML
@@ -287,6 +287,10 @@ class QuantDeltaConverterSparse(_DeltaConverter):
 class DeltaConverter(_DeltaConverter):
     """Converter without categorized label"""
 
+    def __init__(self, x: np.ndarray, y: pd.DataFrame, tf_list: list, tfbs_df: pd.DataFrame):
+        self.tfbs = tfbs_df
+        super(DeltaConverter, self).__init__()
+
     def converter(self):
         i = 0
         new_y_dpsi = []
@@ -298,7 +302,7 @@ class DeltaConverter(_DeltaConverter):
             for event_1, event_2 in combinations(event_ind_list, 2):
                 delta_psi = abs(self.y.at[event_1, 'ZPSI'] - self.y.at[event_2, 'ZPSI'])
                 if delta_psi:
-                    delta_feature = self.x[event_1] ^ self.x[event_2]
+                    delta_feature = (self.x[event_1] ^ self.x[event_2]) - self.tfbs.loc[gene]
                 else:
                     continue
                 self.new_x[i] = delta_feature
