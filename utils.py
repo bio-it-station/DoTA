@@ -289,7 +289,7 @@ class DeltaConverter(_DeltaConverter):
 
     def __init__(self, x: np.ndarray, y: pd.DataFrame, tf_list: list, tfbs_df: pd.DataFrame):
         self.tfbs = tfbs_df
-        super(DeltaConverter, self).__init__()
+        super(DeltaConverter, self).__init__(x, y, tf_list)
 
     def converter(self):
         i = 0
