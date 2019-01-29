@@ -302,7 +302,7 @@ class DeltaConverter(_DeltaConverter):
             for event_1, event_2 in combinations(event_ind_list, 2):
                 delta_psi = abs(self.y.at[event_1, 'ZPSI'] - self.y.at[event_2, 'ZPSI'])
                 if delta_psi:
-                    delta_feature = (self.x[event_1] ^ self.x[event_2]) - self.tfbs.loc[gene]
+                    delta_feature = (self.x[event_1] ^ self.x[event_2]).astype(np.int) - self.tfbs.loc[gene]
                 else:
                     continue
                 self.new_x[i] = delta_feature
