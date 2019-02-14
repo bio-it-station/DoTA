@@ -38,8 +38,8 @@ def parse_options():
                        help='Number of threads to use (range: 1~{}, default=1)'.format(threads))
     gpu_device = torch.cuda.device_count()
     param.add_argument('-g', '--gpu', metavar='<gpu device>',
-                       choices=range(0, gpu_device - 1), type=int, default='0',
-                       help='Which gpu device to use (range: 0~{}, default=0)'.format(gpu_device - 1))
+                       choices=range(0, gpu_device), type=int, default='0',
+                       help='Which gpu device to use (range: 0~{}, default=0)'.format(gpu_device))
     param.add_argument('-b', '--batch', default=128, type=int)
     param.add_argument('-e', '--epoch', default=10, type=int)
     param.add_argument('--checkpoint', help='Prefix of checkoutput output folder')
@@ -70,12 +70,15 @@ class DotaDataset(Dataset):
 
 
 class DotaNet(nn.Module):
-    def __init__(self, n_tf):
+    def __init__(self, n_tf, con_size=50, dilation=1, pool_size=10):
         super(DotaNet, self).__init__()
-        self.conv1 = nn.Conv1d(n_tf, 128, 50)
-        self.pool1 = nn.MaxPool1d(10)
+        self.con_size = con_size
+        self.dilation = dilation
+        self.pool_size = pool_size
+        self.conv1 = nn.Conv1d(n_tf, 128, self.con_size, dilation=self.dilation)
+        self.pool1 = nn.MaxPool1d(self.pool_size)
         self.drop1 = nn.Dropout(p=0.25)
-        self.fc1 = nn.Linear(245 * 128, 128)
+        self.fc1 = nn.Linear((2500 - self.con_size * self.dilation) // self.pool_size * 128, 128)
         self.drop2 = nn.Dropout(p=0.25)
         self.fc2 = nn.Linear(128, 128)
         self.drop3 = nn.Dropout(p=0.25)
@@ -85,7 +88,7 @@ class DotaNet(nn.Module):
 
     def forward(self, x):
         x = self.drop1(self.pool1(F.relu(self.conv1(x))))
-        x = x.view(-1, 128 * 245)  # flatten
+        x = x.view(-1, 128 * (2500 - self.con_size * self.dilation) // self.pool_size)  # flatten
         x = self.drop2(F.relu(self.fc1(x)))
         x = self.drop3(F.relu(self.fc2(x)))
         x = self.drop4(F.relu(self.fc3(x)))
@@ -167,7 +170,7 @@ def main():
     if not args.L:
         if args.checkpoint and not os.path.exists(args.checkpoint):
             os.makedirs(args.checkpoint)
-        net = DotaNet(n_tf=n_tf).to(cuda)
+        net = DotaNet(n_tf=n_tf, dilation=2).to(cuda)
         criterion = nn.BCEWithLogitsLoss()
         optimizer = optim.Adam(net.parameters())
         print('Start Training...')
