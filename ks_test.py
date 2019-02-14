@@ -2,6 +2,7 @@
 import argparse
 import errno
 import gc
+import glob
 import os
 import pickle
 import shutil
@@ -11,10 +12,10 @@ import tempfile
 import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed, dump, load
-from scipy.stats import ks_2samp
+from scipy.stats import ks_2samp, mannwhitneyu
 from statsmodels.stats.multitest import multipletests
 
-from plot import plot_cdf
+from plot import tf_wise_boxplot, tf_wise_cdf
 from utils import _getThreads
 
 
@@ -42,13 +43,14 @@ def parse_options():
     return parser.parse_args()
 
 
-def do_ks_test(X, Y, idx, tf, output_file):
+def do_statistics(X, Y, idx, tf, output_file):
     feature_0 = Y[np.where(X[:, idx] == 0)[0]]
     feature_1 = Y[np.where(X[:, idx] == 1)[0]]
     if feature_0.shape[0] and feature_1.shape[0]:
         data = (feature_0, feature_1)
-        plot_cdf(data, output_file)
-        return tf, ks_2samp(feature_0, feature_1)
+        tf_wise_boxplot(data, output_file)
+        tf_wise_cdf(data, output_file)
+        return (tf, *mannwhitneyu(feature_0, feature_1), *ks_2samp(feature_0, feature_1))
     return None
 
 
@@ -92,11 +94,9 @@ def main():
 
     # create pool and exec
     results = Parallel(n_jobs=args.p)(
-        delayed(do_ks_test)(
-            X, Y, idx, tf, args.o + tf
-        ) for idx, tf in enumerate(Tf_list)
+        delayed(do_statistics)(X, Y, idx, tf, args.o + tf) for idx, tf in enumerate(Tf_list)
     )
-    ks_result = {result[0]: result[1] for result in results if result if not None}
+    ks_result = {result[0]: result[1:] for result in results if result}
     print('\nks-test complete!')
 
     # cleanup
@@ -107,14 +107,15 @@ def main():
             print('failed to clean-up mmep automatically', file=sys.stderr)
 
     # Convert to pd.dataframe and do pval correction
-    df = pd.DataFrame.from_dict(ks_result, orient='index')
-    df['adj_pval'] = multipletests(df.pvalue, alpha=0.05, method='bonferroni')[1]
+    df = pd.DataFrame.from_dict(ks_result, orient='index', columns=['mann_stat', 'mann_pval', 'ks_stat', 'ks_pval'])
+    df['mann_adj_pval'] = multipletests(df['mann_pval'], alpha=0.05, method='bonferroni')[1]
+    df['ks_adj_pval'] = multipletests(df['ks_pval'], alpha=0.05, method='bonferroni')[1]
     df.to_csv(args.o + 'ks_test.csv')
 
     # Move the CDF plots to accept or reject subdirectory depending on its adj_pval
     print('\nMoving files to corresponding folder...')
     for tf, row in df.iterrows():
-        if row.adj_pval < 1e-30:
+        if row['ks_adj_pval'] < 1e-30:
             category = 'accept'
         else:
             category = 'reject'
@@ -123,7 +124,8 @@ def main():
         except OSError as err:
             if err.errno != errno.EEXIST:
                 raise
-        os.rename('{}{}.png'.format(args.o, tf), '{}{}/{}.png'.format(args.o, category, tf))
+        for f in glob.glob('{}{}*.png'.format(args.o, tf)):
+            shutil.move(f, args.o + category)
 
     print('\nComplete!')
 
