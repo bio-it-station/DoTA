@@ -1,30 +1,21 @@
 import itertools
-import pickle
 
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 import seaborn as sns
 
 
-def delta_data_boxplot(file_in: str, file_out: str) -> None:
+def delta_data_boxplot(data, file_out: str) -> None:
     """
     Generate boxplot with delta feature sum and delta psi from delta_data
     :param file_in: input_file_name
     :param file_out: output file name
     """
-    with open(file_in, mode='rb') as fh:
-        x, y, _ = pickle.load(fh)
-        y = y['PSI']
-    df = pd.DataFrame(np.sum(x, axis=1, dtype=np.int32),
-                      columns=['delta_feature_sum'])
-    df['delta_psi'] = y
-
-    df = df[df['delta_feature_sum'] < 50]
+    data = data[data['delta_feature_sum'] < 50]
     fig = plt.figure(figsize=(12.0, 4.0))
-    sns.boxplot(x='delta_feature_sum', y='delta_psi', data=df)
+    sns.boxplot(x='delta_feature_sum', y='delta_psi', data=data)
     plt.tight_layout()
     fig.savefig(file_out, dpi=300)
     plt.clf()
@@ -32,7 +23,23 @@ def delta_data_boxplot(file_in: str, file_out: str) -> None:
     plt.gcf().clear()
 
 
-def plot_cdf(data, file_out: str) -> None:
+def tf_wise_boxplot(data, file_out: str) -> None:
+    # Creates two subplots and unpacks the output array immediately
+    labels = ['{}:{}'.format(idx, len(x)) for idx, x in enumerate(data)]
+
+    fig = plt.figure(figsize=(2.0, 4.0), dpi=300)
+    ax = sns.boxplot(data=data, showfliers=False)
+    # ax.axes.get_xaxis().set_visible(False)
+    ax.set_xticklabels(labels)
+    ax.set_ylabel(r'$\Delta Z_{\Psi}$', fontsize=14)
+    fig.tight_layout()
+    fig.savefig('{}_boxplot.png'.format(file_out), transparent=True)
+    plt.clf()
+    plt.close()
+    plt.gcf().clear()
+
+
+def tf_wise_cdf(data, file_out: str) -> None:
     labels = ['{}:{}'.format(idx, len(x)) for idx, x in enumerate(data)]
 
     _, ax = plt.subplots()
