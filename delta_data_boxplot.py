@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 import argparse
+import pickle
+
+import numpy as np
+import pandas as pd
 
 from plot import delta_data_boxplot
 
@@ -25,8 +29,15 @@ def parse_options():
 def main():
     args = parse_options()
 
+    with open(args.i, mode='rb') as fh:
+        X, Y, _ = pickle.load(fh)
+        Y = Y['PSI']
+    df = pd.DataFrame(np.sum(X, axis=1, dtype=np.int32),
+                      columns=['delta_feature_sum'])
+    df['delta_psi'] = Y
+
     filename = args.o + 'boxplot.png'
-    delta_data_boxplot(args.i, filename)
+    delta_data_boxplot(df, filename)
 
 
 if __name__ == '__main__':
