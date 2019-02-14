@@ -5,7 +5,7 @@ import pickle
 import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.ensemble import ExtraTreesClassifier
-from sklearn.metrics import accuracy_score, confusion_matrix
+from sklearn.metrics import accuracy_score, confusion_matrix, roc_auc_score, precision_recall_curve
 from sklearn.model_selection import train_test_split
 from xgboost import XGBClassifier
 
@@ -105,6 +105,7 @@ def main():
 
     y_pred = clf.predict(x_test)
     print('Accuracy on test dataset: ', accuracy_score(y_test, y_pred))
+    print('ROC-AUC: ', roc_auc_score(y_test, y_pred))
 
     cm = confusion_matrix(y_test, y_pred)
     plot_confusion_matrix(cm, classes=['Unchange', 'Change'], normalize=True)
