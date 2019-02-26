@@ -82,17 +82,14 @@ class DotaNet(nn.Module):
         self.drop2 = nn.Dropout(p=0.25)
         self.fc2 = nn.Linear(128, 128)
         self.drop3 = nn.Dropout(p=0.25)
-        self.fc3 = nn.Linear(128, 128)
-        self.drop4 = nn.Dropout(p=0.25)
-        self.fc4 = nn.Linear(128, 1)
+        self.fc3 = nn.Linear(128, 1)
 
     def forward(self, x):
         x = self.drop1(self.pool1(F.relu(self.conv1(x))))
         x = x.view(-1, 128 * (2500 - self.con_size * self.dilation) // self.pool_size)  # flatten
         x = self.drop2(F.relu(self.fc1(x)))
         x = self.drop3(F.relu(self.fc2(x)))
-        x = self.drop4(F.relu(self.fc3(x)))
-        x = self.fc4(x)
+        x = self.fc3(x)
         return x
 
 
